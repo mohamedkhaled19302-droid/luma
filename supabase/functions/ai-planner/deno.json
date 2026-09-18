@@ -1,0 +1,7 @@
+{
+  "name": "ai-planner",
+  "version": "1.0.0",
+  "description": "LUMA AI planner - parses natural language into tasks and explains/refines schedules. Returns structured JSON only; never writes to the database.",
+  "author": "LUMA",
+  "license": "MIT"
+}
