@@ -68,4 +68,5 @@ vt-server.json
 /dark-attendance.png
 /morrow-landing.png
 /preview-light.png
-
+/audit-*.png
+/.playwright-mcp/
