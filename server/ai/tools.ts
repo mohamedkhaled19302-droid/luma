@@ -766,6 +766,20 @@ export type ToolValidation =
   | { ok: true; tool: AiToolName; args: Record<string, unknown>; destructive: boolean }
   | { ok: false; tool: string; reason: string }
 
+export type ToolValidationFailure = Extract<ToolValidation, { ok: false }>
+
+/**
+ * Narrows a validation result to its failure branch.
+ *
+ * A user-defined guard rather than a bare `if (!validation.ok)`, because Vercel's
+ * function builder type-checks `api/` with its own compiler options, where
+ * `strictNullChecks` is off. Without it, narrowing on the boolean literal
+ * discriminant does not kick in and `.reason` looks undefined.
+ */
+export function isToolValidationFailure(value: ToolValidation): value is ToolValidationFailure {
+  return value.ok === false
+}
+
 /**
  * Validate a model-emitted tool call. Rejects unknown tools, malformed JSON,
  * missing required arguments, out-of-range numbers and unexpected keys.

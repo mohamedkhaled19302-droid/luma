@@ -11,6 +11,7 @@ import { parseAssistantReply, proposalFromToolCall } from './proposals.js'
 import { buildContextBlock, buildSystemPrompt } from './prompt.js'
 import {
   confirmationCopy,
+  isToolValidationFailure,
   OPENROUTER_TOOL_SCHEMAS,
   validateToolCall,
 } from './tools.js'
@@ -272,7 +273,7 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
   // without spending another model call.
   if (input.confirm) {
     const validation = validateToolCall(input.confirm.tool, input.confirm.args)
-    if (!validation.ok) {
+    if (isToolValidationFailure(validation)) {
       throw new AiProxyError('bad_request', `That action is not valid: ${validation.reason}`, {
         retryable: false,
       })
