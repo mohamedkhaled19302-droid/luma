@@ -9,15 +9,15 @@
  */
 
 export const BRAND = {
-  /** Display name, sentence case. */
-  name: 'Morrow',
+  /** Display name, uppercase wordmark. */
+  name: 'LUMA',
   /** Wordmark, rendered in the logo/marketing copy. */
-  wordmark: 'MORROW',
+  wordmark: 'LUMA',
   tagline: 'Plan a day that fits your life.',
   description:
-    'Morrow is a personal daily planner that adapts to how you live. Tell it what matters, and it helps you build a realistic plan for today.',
+    'LUMA is a personal daily planner that adapts to how you live. Tell it what matters, and it helps you build a realistic plan for today.',
   /** Namespace for every localStorage / IndexedDB key. */
-  namespace: 'morrow',
+  namespace: 'luma',
   /** Support / feedback link surfaced in the account menu. */
   repoUrl: 'https://github.com/mohamedkhaled19302-droid/luma',
 } as const
@@ -39,15 +39,17 @@ export const STORAGE_KEYS = {
  * nothing is destroyed and a rollback stays possible).
  */
 const LEGACY_KEYS: Record<string, string[]> = {
-  [STORAGE_KEYS.theme]: ['luma-theme'],
-  [STORAGE_KEYS.sounds]: ['luma-sounds-enabled'],
-  [STORAGE_KEYS.syncQueue]: ['luma.sync-queue'],
-  [STORAGE_KEYS.customPresets]: ['luma-custom-presets'],
-  [STORAGE_KEYS.preloadReload]: ['luma:preload-reloaded'],
+  [STORAGE_KEYS.theme]: ['morrow:theme', 'luma-theme'],
+  [STORAGE_KEYS.sounds]: ['morrow:sounds-enabled', 'luma-sounds-enabled'],
+  [STORAGE_KEYS.syncQueue]: ['morrow:sync-queue', 'luma.sync-queue'],
+  [STORAGE_KEYS.customPresets]: ['morrow:custom-presets', 'luma-custom-presets'],
+  [STORAGE_KEYS.preloadReload]: ['morrow:preload-reloaded', 'luma:preload-reloaded'],
 }
 
 /** Same idea for keys that carry a trailing id, e.g. per-session focus timers. */
 const LEGACY_PREFIXES: Array<{ next: string; legacy: string }> = [
+  { next: STORAGE_KEYS.focusTimerPrefix, legacy: 'morrow:focus-timer:' },
+  { next: STORAGE_KEYS.focusSessionsPrefix, legacy: 'morrow:focus-sessions:' },
   { next: STORAGE_KEYS.focusTimerPrefix, legacy: 'luma-focus-timer:' },
   { next: STORAGE_KEYS.focusSessionsPrefix, legacy: 'luma-focus-sessions:' },
 ]

@@ -14,7 +14,7 @@ import { isKnownTool, validateToolCall } from './tools.js'
  * them through the normal Supabase services under the caller's own session.
  */
 
-export const ACTIONS_FENCE = 'morrow-actions'
+export const ACTIONS_FENCE = 'luma-actions'
 export const MAX_PROPOSALS = 4
 const MAX_TITLE = 60
 const MAX_SUMMARY = 160

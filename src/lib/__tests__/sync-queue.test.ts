@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { STORAGE_KEYS } from '../brand'
 import type { SyncFilterChain, SyncFlushClient, SyncOpInput } from '../sync-queue'
 
 type QueueModule = typeof import('../sync-queue')
@@ -141,7 +142,7 @@ describe('sync queue', () => {
     const second = await freshQueue()
     expect(second.list().map((op) => op.id)).toEqual([a.id, b.id])
     expect(second.list()[0]?.payload).toEqual({ title: 'persist' })
-    expect(store.get('morrow:sync-queue')).toBeDefined()
+    expect(store.get(STORAGE_KEYS.syncQueue)).toBeDefined()
 
     second.dequeue(a.id)
     const third = await freshQueue()

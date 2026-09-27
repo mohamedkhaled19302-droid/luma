@@ -35,7 +35,7 @@ How to use them:
 - Call a tool when the person clearly wants that change. Do not call one just to describe it.
 - Several free models cannot call tools directly. When that happens you instead end your reply with a single JSON block:
 
-\`\`\`morrow-actions
+\`\`\`luma-actions
 {"actions":[{"kind":"create_task","title":"Move it to tomorrow","summary":"Science project moves to Wednesday","payload":{"title":"Science project","deadline":"2026-09-30","priority":"high"}}]}
 \`\`\`
 

@@ -1,8 +1,8 @@
-# Morrow
+# LUMA
 
 > Plan your life. Not just your tasks.
 
-Morrow is an offline-first personal planner. It turns deadlines, habits, energy and free time
+LUMA is an offline-first personal planner. It turns deadlines, habits, energy and recovery
 into a calm weekly schedule — then reshapes it around the life you actually want to live.
 
 Nothing here is student-specific: tasks group into **categories** you name yourself (Work,
@@ -12,11 +12,11 @@ whatever commitments you actually have.
 ## Highlights
 
 - **Deterministic scheduler core** (`src/scheduler`) — pure, testable functions that plan your
-  week around commitments, sleep, energy and free time. No randomness, no black box.
+  week around commitments, sleep, energy and recovery. No randomness, no black box.
 - **On-device Plan Assistant** — a command center that adds, deletes and completes tasks,
   plans your day and opens focus sessions. Everything runs locally; nothing is sent to a cloud AI.
 - **Offline-first** — IndexedDB-backed query cache, a queued mutation service, and a PWA service
-  worker keep Morrow usable on an unreliable connection and sync when you're back online.
+  worker keep LUMA usable on an unreliable connection and sync when you're back online.
 - **Deadline pressure & balance** — the scheduler scores tasks by urgency, priority, difficulty
   and energy fit, and scores each day's balance between focus, breaks, habits and free time.
 - **Wellbeing-first** — energy/stress check-ins feed the scheduler so tough work lands in your

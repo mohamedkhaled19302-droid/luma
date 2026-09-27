@@ -41,7 +41,7 @@ create table if not exists public.settings (
     "enabled": false,
     "speak_replies": true,
     "wake_word": false,
-    "wake_phrase": "hey morrow",
+    "wake_phrase": "hey luma",
     "screen_awareness": false,
     "keep_conversations": false,
     "conversation_days": 30,

@@ -373,7 +373,7 @@ describe('importBundle', () => {
 })
 
 describe('backupFilename', () => {
-  it('uses the morrow-backup-YYYY-MM-DD.json pattern', () => {
-    expect(backupFilename(new Date(2026, 8, 20))).toBe('morrow-backup-2026-09-20.json')
+  it('uses the luma-backup-YYYY-MM-DD.json pattern', () => {
+    expect(backupFilename(new Date(2026, 8, 20))).toBe('luma-backup-2026-09-20.json')
   })
 })

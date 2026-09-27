@@ -1,9 +1,9 @@
 {
-  "name": "morrow",
+  "name": "luma",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Morrow - Plan your life. Not just your tasks. An offline-first personal planner.",
+  "description": "LUMA - Plan your life. Not just your tasks. An offline-first personal planner.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -1,4 +1,4 @@
-﻿import Dexie, { type Table } from 'dexie'
+import Dexie, { type Table } from 'dexie'
 import type {
   AppNotification,
   CalendarEvent,
@@ -16,7 +16,7 @@ import type {
 } from '@/types/models'
 
 /**
- * Morrow's local-first data store.
+ * LUMA's local-first data store.
  *
  * Every planner row lives in the browser's IndexedDB. Nothing here reaches the
  * network, so the app works offline by construction and a signed-in account
@@ -59,7 +59,7 @@ export const CONFLICT_KEYS: Record<string, string[]> = {
   notifications: ['id'],
 }
 
-export class MorrowDatabase extends Dexie {
+export class LumaDatabase extends Dexie {
   profiles!: Table<Profile, string>
   settings!: Table<Settings, string>
   categories!: Table<Category, string>
@@ -76,12 +76,12 @@ export class MorrowDatabase extends Dexie {
   notifications!: Table<AppNotification, string>
 
   constructor() {
-    // Deliberately NOT named "morrow". `src/storage/indexeddb.ts` already owns
-    // a database called "morrow" opened at raw IndexedDB version 1, and Dexie
+    // Deliberately NOT named "luma". `src/storage/indexeddb.ts` already owns
+    // a database called "luma" opened at raw IndexedDB version 1, and Dexie
     // maps its `version(1)` to IndexedDB version 10. Sharing the name makes
     // whichever opens second fail with
     // "The requested version (1) is less than the existing version (10)".
-    super('morrow-planner')
+    super('luma-planner')
     // Indexes are declared only where the query layer actually filters or
     // sorts, so the upgrade path stays trivial.
     this.version(1).stores({
@@ -103,14 +103,14 @@ export class MorrowDatabase extends Dexie {
   }
 }
 
-export const localDb = new MorrowDatabase()
+export const localDb = new LumaDatabase()
 
 /**
  * The database is the render-blocking dependency for the whole planner, so a
  * corrupt or blocked IndexedDB (private windows, disabled storage) must fail
  * loudly and immediately rather than surface later as confusing empty lists.
  */
-export async function ensureLocalDb(): Promise<MorrowDatabase> {
+export async function ensureLocalDb(): Promise<LumaDatabase> {
   if (!localDb.isOpen()) {
     await localDb.open()
   }

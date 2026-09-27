@@ -284,7 +284,7 @@ export function backupFilename(date = new Date()): string {
   const yyyy = date.getFullYear()
   const mm = String(date.getMonth() + 1).padStart(2, '0')
   const dd = String(date.getDate()).padStart(2, '0')
-  return `morrow-backup-${yyyy}-${mm}-${dd}.json`
+  return `luma-backup-${yyyy}-${mm}-${dd}.json`
 }
 
 export function downloadJson(bundle: ExportBundle, filename?: string): void {

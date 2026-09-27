@@ -1,4 +1,4 @@
-ï»¿import { lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -28,13 +28,13 @@ const features = [
   {
     icon: Brain,
     title: 'A scheduler that thinks',
-    description: `${BRAND.name} plans your day around deadlines, energy and real focus time â€” not just a to-do list.`,
+    description: `${BRAND.name} plans your day around deadlines, energy and real focus time — not just a to-do list.`,
     color: 'from-violet-500 to-purple-500',
   },
   {
     icon: CalendarRange,
     title: 'Every block counts',
-    description: 'Appointments, commitments, deep work and rest â€” one calm timeline instead of ten scattered apps.',
+    description: 'Appointments, commitments, deep work and rest — one calm timeline instead of ten scattered apps.',
     color: 'from-indigo-500 to-blue-500',
   },
   {
@@ -46,13 +46,13 @@ const features = [
   {
     icon: Waves,
     title: 'Rest is part of the plan',
-    description: 'Breaks, sleep and free time are scheduled like everything else. Burnout is not part of the plan.',
+    description: 'Breaks and sleep are scheduled like everything else. Burnout is not part of the plan.',
     color: 'from-sky-500 to-cyan-500',
   },
   {
     icon: LayoutTemplate,
     title: 'Templates that launch you',
-    description: 'Deadline sprints, big projects, weekly resets â€” proven plans you can apply with one tap.',
+    description: 'Deadline sprints, big projects, weekly resets — proven plans you can apply with one tap.',
     color: 'from-amber-500 to-orange-500',
   },
   {
@@ -67,7 +67,7 @@ const stats = [
   { value: '3D', label: 'Interactive orbit view' },
   { value: '6+', label: 'Ready-made templates' },
   { value: '100%', label: 'Offline capable' },
-  { value: 'âˆž', label: 'Reschedules with you' },
+  { value: '8', label: 'Reschedules with you' },
 ]
 
 export default function LandingPage() {
@@ -93,7 +93,7 @@ export default function LandingPage() {
       </header>
 
       <main>
-        {/* â€”â€”â€”â€”â€” HERO â€”â€”â€”â€”â€” */}
+        {/* ————— HERO ————— */}
         <section className="relative flex min-h-[calc(100svh-4.25rem)] flex-col items-center justify-center overflow-hidden">
           {/* 3D universe behind everything */}
           {isDesktop ? (
@@ -121,7 +121,7 @@ export default function LandingPage() {
               </span>
             </div>
 
-            {/* Mobile 3D â€” above headline */}
+            {/* Mobile 3D — above headline */}
             {!isDesktop && (
               <Suspense fallback={<div className="mx-auto mt-8 h-48" />}>
                 <Hero3DCompact className="mx-auto mt-6 h-48 w-full max-w-xs" />
@@ -137,7 +137,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-xl text-pretty text-lg leading-relaxed text-muted-foreground sm:text-xl">
-              {BRAND.name} turns deadlines, habits and energy into a calm weekly plan â€”
+              {BRAND.name} turns deadlines, habits and energy into a calm weekly plan —
               then reshapes it around the life you actually want to live.
             </p>
 
@@ -171,7 +171,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* â€”â€”â€”â€”â€” STATS STRIP â€”â€”â€”â€”â€” */}
+        {/* ————— STATS STRIP ————— */}
         <section className="relative z-10 border-y bg-muted/40 backdrop-blur-sm">
           <div className="mx-auto grid max-w-5xl grid-cols-2 divide-x sm:grid-cols-4">
             {stats.map((stat) => (
@@ -183,7 +183,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* â€”â€”â€”â€”â€” FEATURES â€”â€”â€”â€”â€” */}
+        {/* ————— FEATURES ————— */}
         <section className="relative mx-auto w-full max-w-6xl px-6 py-20 sm:py-28">
           <div className="mx-auto max-w-2xl text-center">
             <span className="gradient-brand-text text-sm font-bold uppercase tracking-widest">
@@ -193,7 +193,7 @@ export default function LandingPage() {
               Six tools. One calm command center.
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Each piece works alone â€” together they run your whole week.
+              Each piece works alone — together they run your whole week.
             </p>
           </div>
 
@@ -221,7 +221,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* â€”â€”â€”â€”â€” 3D CALLOUT â€”â€”â€”â€”â€” */}
+        {/* ————— 3D CALLOUT ————— */}
         <section className="relative overflow-hidden border-t bg-muted/30">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-20 lg:grid-cols-2 lg:py-28">
             <div>
@@ -233,7 +233,7 @@ export default function LandingPage() {
               </h2>
               <p className="mt-4 max-w-md text-lg leading-relaxed text-muted-foreground">
                 Your classes, tasks and breaks orbit around your day. Drag to look
-                around, hover a ring to preview what&apos;s coming up â€” then watch it
+                around, hover a ring to preview what&apos;s coming up — then watch it
                 reshape itself as your week fills in.
               </p>
               <Button asChild className="mt-8" size="lg">
@@ -247,14 +247,14 @@ export default function LandingPage() {
               <div className="text-center">
                 <Orbit className="mx-auto h-12 w-12 text-primary" style={{ animation: 'float-slow 3s ease-in-out infinite' }} />
                 <p className="mt-3 text-sm font-medium text-muted-foreground">
-                  Interactive 3D â€” sign in to see yours
+                  Interactive 3D — sign in to see yours
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* â€”â€”â€”â€”â€” FINAL CTA â€”â€”â€”â€”â€” */}
+        {/* ————— FINAL CTA ————— */}
         <section className="relative overflow-hidden">
           <div className="mx-auto max-w-4xl px-6 py-20 text-center sm:py-28">
             <h2 className="font-display text-balance text-3xl font-bold tracking-tight sm:text-5xl">

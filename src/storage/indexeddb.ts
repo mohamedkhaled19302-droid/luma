@@ -3,7 +3,7 @@
  * the storage abstraction. Kept small on purpose.
  */
 
-const DB_NAME = 'morrow'
+const DB_NAME = 'luma'
 const STORE = 'kv'
 
 function openDb(): Promise<IDBDatabase> {

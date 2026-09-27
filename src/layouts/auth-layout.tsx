@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 const SELLING_POINTS = [
   {
     title: 'One plan for your whole life',
-    body: 'Tasks, habits, wellbeing and free time — balanced by an adaptive scheduler.',
+    body: 'Tasks, habits and wellbeing — balanced by an adaptive scheduler.',
   },
   {
     title: 'Know what to do next',

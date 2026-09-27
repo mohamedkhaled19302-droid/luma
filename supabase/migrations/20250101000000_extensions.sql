@@ -1,4 +1,4 @@
--- Morrow baseline schema.
+-- LUMA baseline schema.
 --
 -- This directory is a clean rewrite: it describes the entire database from zero
 -- for a personal planner that works for anyone, not just students. There are no

@@ -1,4 +1,4 @@
-﻿import type { AssistantPrefs } from '@/types/models'
+import type { AssistantPrefs } from '@/types/models'
 
 /**
  * Assistant, voice and privacy preferences.
@@ -14,7 +14,7 @@ export const DEFAULT_ASSISTANT_PREFS: AssistantPrefs = {
   enabled: false,
   speak_replies: true,
   wake_word: false,
-  wake_phrase: 'hey morrow',
+  wake_phrase: 'hey luma',
   screen_awareness: false,
   keep_conversations: false,
   conversation_days: 30,

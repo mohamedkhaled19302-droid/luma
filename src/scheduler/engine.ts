@@ -252,7 +252,6 @@ export function runScheduler(input: SchedulerInput): SchedulerResult {
   }
 
   placeHabits(habits, dayContexts, settings, blocks)
-  fillFreeTime(dayContexts, blocks)
 
   for (const task of workingTasks) {
     const taskSessions = sessions.filter((s) => s.task_id === task.id)
@@ -356,28 +355,6 @@ function pushHabitBlock(
   })
   ctx.placed.push({ start: startMs, end: startMs + lengthMin * 60000, blockType: 'habit' })
   ctx.free = splitIntervals(ctx.free, startMs, startMs + lengthMin * 60000)
-}
-
-function fillFreeTime(dayContexts: DayContext[], blocks: PlannedBlock[]): void {
-  for (const ctx of dayContexts) {
-    for (const gap of ctx.free) {
-      const lengthMin = (gap.end - gap.start) / 60000
-      if (lengthMin < 30) continue
-      const startMs = gap.start + 10 * 60000
-      const endMs = gap.end - 10 * 60000
-      if (endMs <= startMs) continue
-      blocks.push({
-        title: 'Free time',
-        block_type: 'free',
-        start_at: new Date(startMs).toISOString(),
-        end_at: new Date(endMs).toISOString(),
-        task_id: null,
-        habit_id: null,
-        color: null,
-        locked: false,
-      })
-    }
-  }
 }
 
 export function formatPlannedBlocks(blocks: PlannedBlock[]): string[] {

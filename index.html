@@ -13,9 +13,10 @@
         try {
           var stored = null
           try {
-            // Current key first, then the pre-rename key so returning users keep
-            // their theme. src/lib/brand.ts migrates the legacy key permanently.
-            stored = window.localStorage.getItem('morrow:theme')
+            // Current key first, then the pre-rename keys so returning users keep
+            // their theme. src/lib/brand.ts migrates the legacy keys permanently.
+            stored = window.localStorage.getItem('luma:theme')
+            if (stored === null) stored = window.localStorage.getItem('morrow:theme')
             if (stored === null) stored = window.localStorage.getItem('luma-theme')
           } catch (_e) {
             /* storage unavailable - fall through to system pref */
@@ -35,7 +36,7 @@
     </script>
     <meta
       name="description"
-      content="Morrow balances your deadlines, habits, energy, sleep and free time into one realistic daily plan. Plan your life. Not just your tasks."
+      content="LUMA balances your deadlines, habits, energy and sleep into one realistic daily plan. Plan your life. Not just your tasks."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -43,7 +44,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <title>Morrow &mdash; Plan your life. Not just your tasks.</title>
+    <title>LUMA &mdash; Plan your life. Not just your tasks.</title>
   </head>
   <body>
     <div class="theme-body" aria-hidden="true"></div>

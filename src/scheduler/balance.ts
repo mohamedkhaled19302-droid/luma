@@ -1,5 +1,15 @@
 import type { ScheduleBlock } from '@/types/models'
 
+/** Minutes from one `HH:MM` boundary to another, wrapping past midnight. */
+function minutesBetween(start: string, end: string): number {
+  const toMinutes = (value: string): number => {
+    const [hours, minutes] = value.split(':').map(Number)
+    return (hours || 0) * 60 + (minutes || 0)
+  }
+  const raw = toMinutes(end) - toMinutes(start)
+  return raw > 0 ? raw : raw + 24 * 60
+}
+
 export interface BalanceInput {
   blocks: ScheduleBlock[]
   sleepTargetHours: number
@@ -43,9 +53,6 @@ export function computeDayBalance(input: BalanceInput): number {
       case 'break':
         totalBreakMin += len
         break
-      case 'free':
-        totalFreeMin += len
-        break
       default:
         break
     }
@@ -58,6 +65,13 @@ export function computeDayBalance(input: BalanceInput): number {
   // Focus load: comfortable capacity is ~50% of awake time. Cap at 100.
   const safeFocusMin = Math.max(180, awakeMin * 0.5)
   const loadScore = Math.max(0, Math.min(40, 40 * (1 - Math.max(0, totalFocusMin - safeFocusMin) / 240)))
+
+  // Unscheduled time is whatever the waking window has left once every planned
+  // block is subtracted. Measured from the gaps rather than from "free" blocks,
+  // so an empty afternoon still counts as breathing room without the plan
+  // having to invent a placeholder for it.
+  const windowMin = minutesBetween(input.preferredStart, input.preferredEnd)
+  totalFreeMin = Math.max(0, windowMin - awakeMin)
 
   // Free time score: want meaningful free time (>= 2h).
   const freeScore = Math.min(20, Math.round((totalFreeMin / 120) * 20))
