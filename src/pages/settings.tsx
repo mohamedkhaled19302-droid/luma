@@ -1,12 +1,15 @@
+import { BRAND } from '@/lib/brand'
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import {
   Bell,
+  Download,
   LogOut,
   Monitor,
   Moon,
   Palette,
   Sun,
+  Upload,
   User,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,20 +25,38 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/common/states'
 import { signOut } from '@/auth/auth-service'
+import { AssistantSettingsCard } from '@/components/assistant/assistant-settings-card'
+import { supabase } from '@/database/client'
 import { useTheme, type Theme } from '@/lib/theme'
-import { cn, formatError } from '@/lib/utils'
+import {
+  downloadJson,
+  exportAllData,
+  importBundle,
+  parseBundle,
+} from '@/services/data-port-service'
+import { formatError, pluralize } from '@/lib/utils'
 import type { Settings } from '@/types/models'
 
 const DEFAULT_DAY_FORM = {
   wake_time: '07:00',
   bed_time: '23:00',
-  preferred_study_start: '08:00',
-  preferred_study_end: '22:00',
+  focus_start: '08:00',
+  focus_end: '22:00',
   sleep_target_hours: '8',
   break_every_minutes: '60',
   break_minutes: '10',
@@ -69,26 +90,60 @@ const THEME_OPTIONS: Array<{ value: Theme; label: string; icon: LucideIcon }> = 
   { value: 'system', label: 'System', icon: Monitor },
 ]
 
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('Could not read the backup file.'))
+    reader.readAsText(file)
+  })
+}
+
+function SettingsSkeleton() {
+  return (
+    <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+      <Skeleton className="h-10 w-40" />
+      <Skeleton className="h-40 w-full" />
+      <Skeleton className="h-72 w-full" />
+      <Skeleton className="h-48 w-full" />
+      <Skeleton className="h-40 w-full" />
+    </div>
+  )
+}
+
 export default function SettingsPage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const userId = user?.id
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
 
-  const { data: profile, isLoading: profileLoading } = useProfile(userId ?? '')
-  const { data: settings, isLoading: settingsLoading } = useSettings(userId ?? '')
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    error: profileError,
+    refetch: profileRefetch,
+  } = useProfile(userId ?? '')
+  const {
+    data: settings,
+    isLoading: settingsLoading,
+    error: settingsError,
+    refetch: settingsRefetch,
+  } = useSettings(userId ?? '')
   const profileMutation = useProfileMutations(userId ?? '')
   const settingsUpdate = useSettingsUpdate(userId ?? '')
 
-  const [profileForm, setProfileForm] = useState({ full_name: '', school_year: '' })
+  const [profileForm, setProfileForm] = useState({ full_name: '' })
   const [dayForm, setDayForm] = useState<DayForm>(DEFAULT_DAY_FORM)
   const [notifPrefs, setNotifPrefs] = useState<Settings['notification_prefs']>(DEFAULT_NOTIF_PREFS)
+  const [exporting, setExporting] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     if (!profile) return
     setProfileForm({
       full_name: profile.full_name ?? '',
-      school_year: profile.school_year ?? '',
     })
   }, [profile])
 
@@ -97,8 +152,8 @@ export default function SettingsPage() {
     setDayForm({
       wake_time: settings.wake_time,
       bed_time: settings.bed_time,
-      preferred_study_start: settings.preferred_study_start,
-      preferred_study_end: settings.preferred_study_end,
+      focus_start: settings.focus_start,
+      focus_end: settings.focus_end,
       sleep_target_hours: String(settings.sleep_target_hours),
       break_every_minutes: String(settings.break_every_minutes),
       break_minutes: String(settings.break_minutes),
@@ -112,16 +167,28 @@ export default function SettingsPage() {
     setNotifPrefs(settings.notification_prefs)
   }, [settings])
 
-  if (!user) return <Navigate to="/auth/sign-in" replace />
+  if (loading) {
+    return <SettingsSkeleton />
+  }
 
-  if (settingsLoading || profileLoading) {
+  if (!user) {
+    return <Navigate to="/auth/sign-in" replace />
+  }
+
+  if (settingsLoading || profileLoading || !settings || !profile) {
+    return <SettingsSkeleton />
+  }
+
+  if (profileError || settingsError) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-72 w-full" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-40 w-full" />
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+        <ErrorState
+          message={formatError(profileError ?? settingsError)}
+          onRetry={() => {
+            void profileRefetch()
+            void settingsRefetch()
+          }}
+        />
       </div>
     )
   }
@@ -130,7 +197,6 @@ export default function SettingsPage() {
     profileMutation.mutate(
       {
         full_name: profileForm.full_name,
-        school_year: profileForm.school_year.trim() !== '' ? profileForm.school_year.trim() : null,
       },
       {
         onSuccess: () => toast.success('Profile updated.'),
@@ -144,11 +210,11 @@ export default function SettingsPage() {
     const changes: Record<string, unknown> = {}
     if (dayForm.wake_time !== settings.wake_time) changes.wake_time = dayForm.wake_time
     if (dayForm.bed_time !== settings.bed_time) changes.bed_time = dayForm.bed_time
-    if (dayForm.preferred_study_start !== settings.preferred_study_start) {
-      changes.preferred_study_start = dayForm.preferred_study_start
+    if (dayForm.focus_start !== settings.focus_start) {
+      changes.focus_start = dayForm.focus_start
     }
-    if (dayForm.preferred_study_end !== settings.preferred_study_end) {
-      changes.preferred_study_end = dayForm.preferred_study_end
+    if (dayForm.focus_end !== settings.focus_end) {
+      changes.focus_end = dayForm.focus_end
     }
     if (dayForm.sleep_target_hours !== String(settings.sleep_target_hours)) {
       changes.sleep_target_hours = Number(dayForm.sleep_target_hours)
@@ -209,22 +275,58 @@ export default function SettingsPage() {
     }
   }
 
+  const handleExport = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const exportBundle = await exportAllData(supabase)
+      downloadJson(exportBundle)
+      toast.success('Backup downloaded.')
+    } catch (error) {
+      toast.error(formatError(error))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!selectedFile || importing) return
+    setImporting(true)
+    try {
+      const text = await readFileAsText(selectedFile)
+      const bundle = parseBundle(text)
+      const result = await importBundle(supabase, bundle)
+      setImportOpen(false)
+      setSelectedFile(null)
+      toast.success(
+        `Restored ${result.restored} ${pluralize(result.restored, 'row')} (${result.inserted} new, ${result.updated} updated).`,
+      )
+      if (result.errors.length > 0) {
+        result.errors.forEach((message) => toast.error(message))
+      }
+    } catch (error) {
+      toast.error(formatError(error))
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
+    <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Shape LUMA around the way you live.
+          Shape {BRAND.name} around the way you live.
         </p>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <User className="h-4 w-4 text-primary" aria-hidden="true" />
             Profile
           </CardTitle>
-          <CardDescription>How LUMA should greet you.</CardDescription>
+          <CardDescription>How {BRAND.name} should greet you.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -239,17 +341,6 @@ export default function SettingsPage() {
                 placeholder="Your name"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="school-year">School year</Label>
-              <Input
-                id="school-year"
-                value={profileForm.school_year}
-                onChange={(event) =>
-                  setProfileForm({ ...profileForm, school_year: event.target.value })
-                }
-                placeholder="e.g. Sophomore"
-              />
-            </div>
           </div>
           <div className="flex justify-end">
             <Button onClick={saveProfile} disabled={profileMutation.isPending}>
@@ -259,9 +350,13 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {settings.assistant_prefs ? (
+        <AssistantSettingsCard userId={settings.user_id} prefs={settings.assistant_prefs} />
+      ) : null}
+
       <Card>
         <CardHeader>
-          <CardTitle>Your day</CardTitle>
+          <CardTitle className="text-lg">Your day</CardTitle>
           <CardDescription>The rhythm you want to protect.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -291,9 +386,9 @@ export default function SettingsPage() {
               <Input
                 id="focus-start"
                 type="time"
-                value={dayForm.preferred_study_start}
+                value={dayForm.focus_start}
                 onChange={(event) =>
-                  setDayForm({ ...dayForm, preferred_study_start: event.target.value })
+                  setDayForm({ ...dayForm, focus_start: event.target.value })
                 }
               />
             </div>
@@ -302,9 +397,9 @@ export default function SettingsPage() {
               <Input
                 id="focus-end"
                 type="time"
-                value={dayForm.preferred_study_end}
+                value={dayForm.focus_end}
                 onChange={(event) =>
-                  setDayForm({ ...dayForm, preferred_study_end: event.target.value })
+                  setDayForm({ ...dayForm, focus_end: event.target.value })
                 }
               />
             </div>
@@ -360,7 +455,7 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+          <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/30 p-4">
             <div>
               <p className="text-sm font-medium">Deep work when I&apos;m most energetic</p>
               <p className="text-xs text-muted-foreground">
@@ -382,7 +477,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Bell className="h-4 w-4 text-primary" aria-hidden="true" />
             Notifications
           </CardTitle>
@@ -415,47 +510,117 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Palette className="h-4 w-4 text-primary" aria-hidden="true" />
             Appearance
           </CardTitle>
           <CardDescription>Pick a theme that feels like you.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-2">
+          <RadioGroup
+            value={theme}
+            onValueChange={(value) => selectTheme(value as Theme)}
+            aria-label="Theme"
+            className="grid gap-2 sm:grid-cols-3"
+          >
             {THEME_OPTIONS.map((option) => {
-              const active = theme === option.value
               const OptionIcon = option.icon
               return (
-                <button
+                <Label
                   key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => selectTheme(option.value)}
-                  className={cn(
-                    'flex flex-col items-center gap-1.5 rounded-lg border p-4 text-sm font-medium transition-colors',
-                    active
-                      ? 'border-primary bg-primary/5 text-foreground'
-                      : 'border-border text-muted-foreground hover:bg-muted',
-                  )}
+                  htmlFor={`theme-${option.value}`}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-input bg-background/60 p-4 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-accent data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70"
                 >
-                  <OptionIcon className="h-4 w-4" aria-hidden="true" />
-                  {option.label}
-                </button>
+                  <span className="flex items-center gap-2.5">
+                    <OptionIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+                    {option.label}
+                  </span>
+                  <RadioGroupItem value={option.value} id={`theme-${option.value}`} />
+                </Label>
               )
             })}
-          </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 
+      <Card className="relative overflow-hidden">
+        <div className="gradient-brand absolute inset-x-0 top-0 h-1" aria-hidden="true" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Download className="h-4 w-4 text-primary" aria-hidden="true" />
+            Backup your data
+          </CardTitle>
+          <CardDescription>Download a full copy of everything {BRAND.name} keeps for you.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-xs text-sm text-muted-foreground">
+            A single JSON file you can restore anytime.
+          </p>
+          <Button onClick={handleExport} disabled={exporting}>
+            {exporting ? 'Exporting...' : 'Export'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="relative overflow-hidden">
+        <div className="gradient-brand absolute inset-x-0 top-0 h-1" aria-hidden="true" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Upload className="h-4 w-4 text-primary" aria-hidden="true" />
+            Restore from backup
+          </CardTitle>
+          <CardDescription>Bring your data back from a backup file.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-xs text-sm text-muted-foreground">
+            Rows you already have are updated in place, so restoring is always safe to repeat.
+          </p>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4" aria-hidden="true" />
+            Import
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restore from backup</DialogTitle>
+            <DialogDescription>
+              Choose a {BRAND.name} backup (.json) file to restore.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="backup-file">Backup file</Label>
+            <Input
+              id="backup-file"
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setImportOpen(false)}
+              disabled={importing}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={!selectedFile || importing}>
+              {importing ? 'Restoring...' : 'Restore'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <User className="h-4 w-4 text-primary" aria-hidden="true" />
             Account
           </CardTitle>
-          <CardDescription>About your LUMA account.</CardDescription>
+          <CardDescription>About your {BRAND.name} account.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <div>

@@ -87,34 +87,23 @@ export async function listAllHabitLogs(userId: string, from: string, to: string)
   return data ?? []
 }
 
+/**
+ * One atomic write instead of read-then-insert. The previous two-step version
+ * raced: two rapid toggles (or an optimistic UI click) could both see "no row"
+ * and then both insert, leaving a duplicate for the same habit + day.
+ */
 export async function setHabitLog(input: {
   user_id: string
   habit_id: string
   log_date: string
   completed: boolean
 }): Promise<HabitLog> {
-  const existing = await supabase
-    .from('habit_logs')
-    .select(HABIT_LOG_COLUMNS)
-    .eq('user_id', input.user_id)
-    .eq('habit_id', input.habit_id)
-    .eq('log_date', input.log_date)
-    .maybeSingle()
-
-  if (existing.data) {
-    const { data, error } = await supabase
-      .from('habit_logs')
-      .update({ completed: input.completed })
-      .eq('id', existing.data.id)
-      .select(HABIT_LOG_COLUMNS)
-      .single()
-    if (error) throw error
-    return data
-  }
-
   const { data, error } = await supabase
     .from('habit_logs')
-    .insert(input)
+    .upsert(
+      { user_id: input.user_id, habit_id: input.habit_id, log_date: input.log_date, completed: input.completed },
+      { onConflict: 'user_id,habit_id,log_date' },
+    )
     .select(HABIT_LOG_COLUMNS)
     .single()
   if (error) throw error

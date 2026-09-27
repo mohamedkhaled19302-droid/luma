@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Check,
+  Flame,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -44,7 +45,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
-import { EmptyState } from '@/components/common/states'
+import { EmptyState, ErrorState } from '@/components/common/states'
 import { Spinner } from '@/components/common/loading'
 import { cn, formatError } from '@/lib/utils'
 
@@ -325,7 +326,7 @@ export default function HabitsPage() {
 
   if (!userId) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
         <EmptyState title="Sign in to build your habits" />
       </div>
     )
@@ -333,25 +334,34 @@ export default function HabitsPage() {
 
   if (habits.isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
         <div className="flex items-center justify-between gap-4">
-          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-9 w-44" />
           <Skeleton className="h-9 w-28" />
         </div>
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
         </div>
       </div>
     )
   }
 
+  if (habits.isError) {
+    return (
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+        <ErrorState message={formatError(habits.error)} onRetry={() => void habits.refetch()} />
+      </div>
+    )
+  }
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Habits</h1>
+          <h1 className="font-display font-bold tracking-tight text-2xl sm:text-3xl">Habits</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Tiny rituals that compound into who you want to be.
           </p>
@@ -360,19 +370,28 @@ export default function HabitsPage() {
           <Plus className="h-4 w-4" aria-hidden="true" />
           New habit
         </Button>
-      </div>
+      </header>
 
       {activeHabits.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="mb-3 text-sm font-semibold">Today</p>
+        <Card className="relative overflow-hidden">
+          <div className="gradient-brand absolute inset-x-0 top-0 h-1" aria-hidden="true" />
+          <CardContent className="p-4 pt-5">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-sm">
+                <Flame className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <p className="font-display font-semibold tracking-tight">Today</p>
+              <span className="ml-auto text-xs font-medium text-muted-foreground">
+                {activeHabits.length} active
+              </span>
+            </div>
             <ul className="space-y-1">
               {activeHabits.map((habit) => {
                 const done = doneToday(habit)
                 return (
                   <li
                     key={habit.id}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted"
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60"
                   >
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: habit.color }} />
                     <span className={cn('min-w-0 flex-1 truncate text-sm', done && 'text-muted-foreground line-through')}>
@@ -383,7 +402,7 @@ export default function HabitsPage() {
                       onClick={() => toggleLog(habit)}
                       aria-label={done ? `Mark ${habit.name} as not done` : `Mark ${habit.name} done`}
                       className={cn(
-                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all',
+                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                         done ? 'border-transparent text-white' : 'border-input text-transparent hover:border-primary',
                       )}
                       style={done ? { backgroundColor: habit.color } : undefined}
@@ -411,16 +430,22 @@ export default function HabitsPage() {
           }
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {allHabits.map((habit) => {
             const done = doneToday(habit)
             return (
-              <Card key={habit.id} className={cn(!habit.active && 'opacity-70')}>
+              <Card
+                key={habit.id}
+                className={cn(
+                  'group relative overflow-hidden transition-all duration-200 hover:border-primary/25 hover:shadow-soft-md',
+                  !habit.active && 'opacity-70',
+                )}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
                       <span
-                        className="h-3 w-3 shrink-0 rounded-full"
+                        className="h-3 w-3 shrink-0 rounded-full shadow-sm"
                         style={{ backgroundColor: habit.color }}
                       />
                       <p className="truncate text-sm font-medium">{habit.name}</p>
@@ -447,7 +472,7 @@ export default function HabitsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
+                          className="text-red-700 focus:text-red-700 dark:text-red-400 dark:focus:text-red-400"
                           onClick={() => deleteHabit(habit)}
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -457,7 +482,7 @@ export default function HabitsPage() {
                     </DropdownMenu>
                   </div>
                   {habit.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{habit.description}</p>
+                    <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{habit.description}</p>
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className="capitalize">
@@ -465,7 +490,7 @@ export default function HabitsPage() {
                     </Badge>
                     <Badge variant="secondary">{habit.target_per_week}× / week</Badge>
                     {done ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                         <Check className="h-3 w-3" aria-hidden="true" />
                         Done today
                       </span>

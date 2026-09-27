@@ -8,10 +8,10 @@ import { formatDayKey } from '@/scheduler/time'
 
 function greetingFor(date: Date, name: string): string {
   const hour = date.getHours()
-  if (hour < 5) return `Still up, ${name}.`
-  if (hour < 12) return `Good morning, ${name}.`
-  if (hour < 18) return `Good afternoon, ${name}.`
-  return `Good evening, ${name}.`
+  if (hour < 5) return `Still up, ${name}?`
+  if (hour < 12) return `Good morning, ${name}`
+  if (hour < 18) return `Good afternoon, ${name}`
+  return `Good evening, ${name}`
 }
 
 function getFirstName(fullName: string): string {
@@ -36,7 +36,7 @@ export async function getDashboardSummary(userId: string): Promise<DashboardSumm
     .filter((task) => task.deadline != null)
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
 
-  const name = getFirstName(profile?.full_name || 'student')
+  const name = getFirstName(profile?.full_name || 'there')
 
   return {
     greeting: greetingFor(now, name),

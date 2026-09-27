@@ -33,11 +33,11 @@ interface DayContext {
   awakeEndMs: number
   free: Interval[]
   placed: PlacedSegment[]
-  studyMinutes: number
+  focusMinutes: number
   dailyTargetMinutes: number
 }
 
-const STUDY_BLOCK_TYPES: BlockType[] = ['task', 'study', 'habit']
+const FOCUS_BLOCK_TYPES: BlockType[] = ['task', 'focus', 'habit']
 
 function clampChunk(
   remaining: number,
@@ -50,15 +50,15 @@ function clampChunk(
   return upper
 }
 
-/** Length in minutes of the continuous study run immediately before startMs. */
-function studyRunLengthBefore(placed: PlacedSegment[], startMs: number): number {
+/** Length in minutes of the continuous focus run immediately before startMs. */
+function focusRunLengthBefore(placed: PlacedSegment[], startMs: number): number {
   const sorted = [...placed].sort((a, b) => a.start - b.start)
   let run = 0
   let cursor = startMs
   for (let i = sorted.length - 1; i >= 0; i -= 1) {
     const block = sorted[i]
     if (!block) break
-    if (block.end === cursor && STUDY_BLOCK_TYPES.includes(block.blockType)) {
+    if (block.end === cursor && FOCUS_BLOCK_TYPES.includes(block.blockType)) {
       run += block.end - block.start
       cursor = block.start
     } else if (block.end === cursor && block.blockType === 'break') {
@@ -127,7 +127,7 @@ export function runScheduler(input: SchedulerInput): SchedulerResult {
       awakeEndMs,
       free,
       placed: [],
-      studyMinutes: 0,
+      focusMinutes: 0,
       dailyTargetMinutes: Math.min(420, Math.round(totalFreeMinutes * 0.8)),
     })
   }
@@ -166,7 +166,7 @@ export function runScheduler(input: SchedulerInput): SchedulerResult {
           const intervalLen = (gap.end - gap.start) / 60000
           if (!allowSplit && task.remaining > intervalLen) continue
 
-          const continuousRun = studyRunLengthBefore(ctx.placed, gap.start)
+          const continuousRun = focusRunLengthBefore(ctx.placed, gap.start)
           const needsBreak = continuousRun >= settings.breakEveryMinutes
           let startMs = gap.start
           if (needsBreak) {
@@ -190,12 +190,11 @@ export function runScheduler(input: SchedulerInput): SchedulerResult {
             preferredEnd: settings.preferredEnd,
             energy,
             prevSameTaskId: prev && prev.end === startMs ? task.id : null,
-            prevSameSubjectId: prev ? task.subject_id : null,
-            dayStudyMinutes: ctx.studyMinutes,
+            prevSameCategoryId: prev ? task.category_id : null,
+            dayFocusMinutes: ctx.focusMinutes,
             dailyTargetMinutes: ctx.dailyTargetMinutes,
-            continuousStudyMinutes: continuousRun,
-            breaksNeeded: 0,
-            fatigueFromRun: continuousRun,
+            continuousFocusMinutes: continuousRun,
+                        fatigueFromRun: continuousRun,
           }, true)
 
           if (!best || score > best.score) {
@@ -230,7 +229,7 @@ export function runScheduler(input: SchedulerInput): SchedulerResult {
         end_at: new Date(chunkEndMs).toISOString(),
         task_id: task.id,
         habit_id: null,
-        color: task.subject_color ?? null,
+        color: task.category_color ?? null,
         locked: false,
       })
       sessions.push({
@@ -240,14 +239,14 @@ export function runScheduler(input: SchedulerInput): SchedulerResult {
         duration_minutes: chunkMin,
       })
       ctx.placed.push({ start: startMs, end: chunkEndMs, blockType: 'task' })
-      ctx.studyMinutes += chunkMin
+      ctx.focusMinutes += chunkMin
 
       task.remaining -= chunkMin
       free = splitIntervals(free, startMs, chunkEndMs)
     }
 
     const remainderAfter = free.reduce((sum, f) => sum + (f.end - f.start) / 60000, 0)
-    if (ctx.studyMinutes > ctx.dailyTargetMinutes * 1.15 && remainderAfter < 60) {
+    if (ctx.focusMinutes > ctx.dailyTargetMinutes * 1.15 && remainderAfter < 60) {
       overloadDays.push(ctx.dayKey)
     }
   }

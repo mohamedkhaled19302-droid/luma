@@ -2,7 +2,7 @@ import { supabase } from '@/database/client'
 import type { Task } from '@/types/models'
 
 export const TASK_COLUMNS =
-  'id, user_id, subject_id, title, description, priority, difficulty, estimated_minutes, remaining_minutes, deadline, can_split, status, locked, scheduled_start, scheduled_end, completed_at, parent_task_id, created_at, updated_at'
+  'id, user_id, category_id, title, description, priority, difficulty, estimated_minutes, remaining_minutes, deadline, can_split, status, locked, scheduled_start, scheduled_end, completed_at, parent_task_id, created_at, updated_at'
 
 export type TaskInsert = Omit<
   Task,
@@ -20,7 +20,7 @@ export type TaskInsert = Omit<
 export type TaskUpdate = Partial<
   Pick<
     Task,
-    | 'subject_id'
+    | 'category_id'
     | 'title'
     | 'description'
     | 'priority'

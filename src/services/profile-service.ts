@@ -1,7 +1,7 @@
 import { supabase } from '@/database/client'
 import type { Profile } from '@/types/models'
 
-const PROFILE_COLUMNS = 'id, full_name, school_year, created_at, updated_at'
+const PROFILE_COLUMNS = 'id, full_name, created_at, updated_at'
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -15,7 +15,7 @@ export async function getProfile(userId: string): Promise<Profile | null> {
 
 export async function upsertProfile(
   userId: string,
-  fields: { full_name: string; school_year: string | null },
+  fields: { full_name: string },
 ): Promise<Profile> {
   const { data, error } = await supabase
     .from('profiles')
@@ -28,7 +28,7 @@ export async function upsertProfile(
 
 export async function updateProfile(
   userId: string,
-  fields: Partial<{ full_name: string; school_year: string | null }>,
+  fields: Partial<{ full_name: string }>,
 ): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')

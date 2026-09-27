@@ -26,7 +26,7 @@ import { useBlockMutations } from '@/hooks/mutations'
 import { runScheduleAndPersist } from '@/services/scheduling-service'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { endOfDay, startOfDay, toMinutesOfDay } from '@/scheduler/time'
-import type { BlockType, ScheduleBlock } from '@/types/models'
+import type { ScheduleBlock } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,22 +41,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/states'
 import { Spinner } from '@/components/common/loading'
 import { cn, formatError } from '@/lib/utils'
+import { blockVisual } from '@/lib/block-visuals'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const VIEW_START_IN_MINUTES = 6 * 60
 const VIEW_END_IN_MINUTES = 24 * 60
 const MINUTE_HEIGHT = 48 / 60
-
-const blockStyles: Record<BlockType, string> = {
-  school: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
-  task: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700',
-  study: 'border-violet-500/30 bg-violet-500/10 text-violet-700',
-  habit: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
-  break: 'border-stone-500/30 bg-stone-500/10 text-stone-700',
-  commitment: 'border-pink-500/30 bg-pink-500/10 text-pink-700',
-  free: 'border-slate-300/40 bg-slate-100/80 text-slate-600',
-  sleep: 'border-slate-700 bg-slate-800 text-slate-200',
-}
 
 function BlockCard({ block, onClick }: { block: ScheduleBlock; onClick: () => void }) {
   const rawStart = toMinutesOfDay(new Date(block.start_at))
@@ -74,7 +64,7 @@ function BlockCard({ block, onClick }: { block: ScheduleBlock; onClick: () => vo
       style={{ top, height }}
       className={cn(
         'absolute left-16 right-2 overflow-hidden rounded-md border px-2 py-1 text-left text-xs shadow-sm transition-colors hover:brightness-110',
-        blockStyles[block.block_type],
+        blockVisual(block.block_type).classes,
         block.completed && 'opacity-50',
       )}
     >
@@ -233,7 +223,7 @@ export default function PlannerPage() {
       </div>
 
       {!settings.isLoading && !settings.data && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
           Finish setup so your plan can match your sleep, energy and study windows.
         </p>
       )}

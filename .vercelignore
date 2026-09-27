@@ -1,0 +1,19 @@
+node_modules
+dist
+.git
+.env
+.env.*
+!.env.example
+*.log
+deploy-*.txt
+verify
+verify-*.mjs
+vt-server.json
+.playwright-mcp
+docs
+supabase
+# Local screenshot captures at the repo root. Anchored so the PWA icons under
+# public/ are still uploaded.
+/dark-attendance.png
+/morrow-landing.png
+/preview-light.png

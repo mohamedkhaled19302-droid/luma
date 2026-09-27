@@ -2,9 +2,9 @@ import type { BlockType, Difficulty, Priority } from '@/types/models'
 
 export interface SchedulerTask {
   id: string
-  subject_id: string | null
-  subject_name?: string | null
-  subject_color?: string | null
+  category_id: string | null
+  category_name?: string | null
+  category_color?: string | null
   title: string
   priority: Priority
   difficulty: Difficulty
@@ -40,6 +40,7 @@ export interface SchedulerSettings {
   breakEveryMinutes: number
   breakMinutes: number
   maxSessionMinutes: number
+  sleepTargetHours: number
   energyPref: boolean
 }
 
@@ -120,10 +121,10 @@ export const DIFFICULTY_WEIGHT: Record<Difficulty, number> = {
 
 export const BLOCK_TYPE_ORDER: BlockType[] = [
   'sleep',
-  'school',
+  'fixed',
   'task',
-  'study',
-  'commitment',
+  'focus',
+  'appointment',
   'habit',
   'break',
   'free',

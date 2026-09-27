@@ -2,11 +2,11 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { AuthLayout } from '@/layouts/auth-layout'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Logo } from '@/components/common/logo'
 import { Spinner } from '@/components/common/loading'
 import { updatePassword } from '@/auth/auth-service'
 import { formatError } from '@/lib/utils'
@@ -38,57 +38,56 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex justify-center">
-          <Logo />
-        </div>
-        <Card>
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl">Set a new password</CardTitle>
-            <CardDescription>Choose something you&rsquo;ll remember.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="password">New password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={8}
-                  placeholder="8 characters or more"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm">Confirm password</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={8}
-                  placeholder="Repeat your password"
-                  value={confirm}
-                  onChange={(event) => setConfirm(event.target.value)}
-                  required
-                />
-              </div>
-              {error && (
-                <p className="text-sm text-destructive" role="alert">
-                  {error}
-                </p>
-              )}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Spinner className="h-4 w-4" />}
-                Update password
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+    <AuthLayout>
+      <div className="space-y-1.5 text-center lg:text-left">
+        <h1 className="font-display text-3xl font-bold tracking-tight">
+          Set a new password
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Choose something you&rsquo;ll remember.
+        </p>
       </div>
-    </main>
+      <Card className="shadow-soft-md">
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">New password</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="8 characters or more"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirm password</Label>
+              <Input
+                id="confirm"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="Repeat your password"
+                value={confirm}
+                onChange={(event) => setConfirm(event.target.value)}
+                required
+              />
+            </div>
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading && <Spinner className="h-4 w-4" />}
+              Update password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </AuthLayout>
   )
 }

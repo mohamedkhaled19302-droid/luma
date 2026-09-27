@@ -37,6 +37,7 @@ Thumbs.db
 
 # Testing
 coverage/
+.playwright-mcp/
 
 # Supabase local
 supabase/.temp/
@@ -45,5 +46,26 @@ supabase/.branches/
 # Vite cache
 .vite/
 
+# Vercel local project link
+.vercel/
+
 # TypeScript build info
 *.tsbuildinfo
+.vercel
+.env*
+
+# Deploy logs. These capture the full command line, which may include a
+# `--token` value. Never commit them.
+deploy-*.txt
+*.log
+
+# Local verification artifacts
+verify/
+verify-*.mjs
+vt-server.json
+
+# Screenshots captured while checking the app
+/dark-attendance.png
+/morrow-landing.png
+/preview-light.png
+

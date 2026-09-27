@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { STORAGE_KEYS } from '@/lib/brand'
 
 export type Theme = 'light' | 'dark' | 'system'
 type ResolvedTheme = 'light' | 'dark'
@@ -17,7 +18,7 @@ interface ThemeContextValue {
   setTheme: (theme: Theme) => void
 }
 
-const STORAGE_KEY = 'luma-theme'
+const STORAGE_KEY = STORAGE_KEYS.theme
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === 'undefined' || !window.matchMedia) return 'light'

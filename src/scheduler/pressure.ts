@@ -1,7 +1,7 @@
 import type { SchedulerTask } from './types'
 
 export interface CapacityProvider {
-  /** Estimated free study minutes in the inclusive window [start, end]. */
+  /** Estimated free planning minutes in the inclusive window [start, end]. */
   freeMinutesBetween(start: Date, end: Date): number
 }
 

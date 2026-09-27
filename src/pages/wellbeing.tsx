@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/common/states'
 import { cn, formatError } from '@/lib/utils'
 import { formatDayKey } from '@/scheduler/time'
 
@@ -42,16 +43,22 @@ function stressDotClass(stress: number | null): string {
 }
 
 export default function WellbeingPage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const userId = user?.id
 
   const today = new Date()
-  const { data: todayCheckin, isLoading } = useWellbeing(userId ?? '', today)
-  const { data: weekCheckins, isLoading: rangeLoading } = useWellbeingRange(
-    userId ?? '',
-    startOfDay(subDays(today, 6)),
-    endOfDay(today),
-  )
+  const {
+    data: todayCheckin,
+    isLoading,
+    error: todayError,
+    refetch: refetchToday,
+  } = useWellbeing(userId ?? '', today)
+  const {
+    data: weekCheckins,
+    isLoading: rangeLoading,
+    error: rangeError,
+    refetch: refetchRange,
+  } = useWellbeingRange(userId ?? '', startOfDay(subDays(today, 6)), endOfDay(today))
   const mutation = useWellbeingMutations(userId ?? '')
 
   const [energy, setEnergy] = useState(5)
@@ -69,15 +76,37 @@ export default function WellbeingPage() {
     setSynced(true)
   }, [todayCheckin, synced])
 
+  if (loading) {
+    return (
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    )
+  }
   if (!user) return <Navigate to="/auth/sign-in" replace />
 
   if (isLoading || rangeLoading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
-        <Skeleton className="h-8 w-40" />
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+        <Skeleton className="h-10 w-56" />
         <Skeleton className="h-72 w-full" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-20 w-full" />
+      </div>
+    )
+  }
+
+  if (todayError || rangeError) {
+    return (
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+        <ErrorState
+          message={formatError(todayError ?? rangeError)}
+          onRetry={() => {
+            void refetchToday()
+            void refetchRange()
+          }}
+        />
       </div>
     )
   }
@@ -106,17 +135,18 @@ export default function WellbeingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
+    <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Wellbeing</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Wellbeing</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Your energy is your most precious resource.
         </p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="overflow-hidden">
+        <div className="gradient-brand absolute inset-x-0 top-0 h-1" aria-hidden="true" />
+        <CardHeader className="relative">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
             Today&apos;s check-in
           </CardTitle>
@@ -126,7 +156,9 @@ export default function WellbeingPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="energy">Energy</Label>
-              <span className="text-sm font-medium text-foreground">{energy}/10</span>
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                {energy}/10
+              </span>
             </div>
             <input
               id="energy"
@@ -136,14 +168,16 @@ export default function WellbeingPage() {
               step={1}
               value={energy}
               onChange={(event) => setEnergy(Number(event.target.value))}
-              className="w-full accent-indigo-500"
+              className="w-full accent-primary"
             />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="stress">Stress</Label>
-              <span className="text-sm font-medium text-foreground">{stress}/10</span>
+              <span className="rounded-full bg-warning/10 px-2 py-0.5 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                {stress}/10
+              </span>
             </div>
             <input
               id="stress"
@@ -153,7 +187,7 @@ export default function WellbeingPage() {
               step={1}
               value={stress}
               onChange={(event) => setStress(Number(event.target.value))}
-              className="w-full accent-indigo-500"
+              className="w-full accent-primary"
             />
           </div>
 
@@ -163,7 +197,11 @@ export default function WellbeingPage() {
                 <Moon className="h-3.5 w-3.5" aria-hidden="true" />
                 Sleep hours
               </Label>
-              {sleepHours !== '' && <span className="text-sm font-medium">{sleepHours}h</span>}
+              {sleepHours !== '' && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-sm font-medium">
+                  {sleepHours}h
+                </span>
+              )}
             </div>
             <Input
               id="sleep"
@@ -197,7 +235,7 @@ export default function WellbeingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Last 7 days</CardTitle>
+          <CardTitle className="text-lg">Last 7 days</CardTitle>
           <CardDescription>A gentle look back at how you have been.</CardDescription>
         </CardHeader>
         <CardContent>

@@ -6,7 +6,7 @@ import {
   listRecentlyCompletedTasks,
   totalCompletedMinutes,
 } from '@/services/task-service'
-import { listSubjects } from '@/services/subject-service'
+import { listCategories } from '@/services/category-service'
 import { listHabits, listAllHabitLogs } from '@/services/habit-service'
 import { getSettings } from '@/services/settings-service'
 import { listEventsBetween } from '@/services/event-service'
@@ -31,15 +31,17 @@ export function useProfile(userId: string) {
     queryFn: () => getProfile(userId),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
-export function useSubjects(userId: string) {
+export function useCategories(userId: string) {
   return useQuery({
-    queryKey: ['subjects', userId],
-    queryFn: () => listSubjects(userId),
+    queryKey: ['categories', userId],
+    queryFn: () => listCategories(userId),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -49,6 +51,7 @@ export function useTasks(userId: string) {
     queryFn: () => listTasks(userId),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -58,6 +61,7 @@ export function useOpenTasks(userId: string) {
     queryFn: () => listOpenTasks(userId),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -67,6 +71,7 @@ export function useTasksDueBefore(userId: string, before: string) {
     queryFn: () => listTasksDueBefore(userId, before),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -76,6 +81,7 @@ export function useRecentlyCompletedTasks(userId: string, after: string) {
     queryFn: () => listRecentlyCompletedTasks(userId, after),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -85,6 +91,7 @@ export function useTotalCompletedMinutes(userId: string, from: string, to: strin
     queryFn: () => totalCompletedMinutes(userId, from, to),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -94,6 +101,7 @@ export function useHabits(userId: string, activeOnly = false) {
     queryFn: () => listHabits(userId, activeOnly),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -103,6 +111,7 @@ export function useHabitLogs(userId: string, from: string, to: string) {
     queryFn: () => listAllHabitLogs(userId, from, to),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -112,6 +121,7 @@ export function useSettings(userId: string) {
     queryFn: () => getSettings(userId),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -121,6 +131,7 @@ export function useEvents(userId: string, from: Date, to: Date) {
     queryFn: () => listEventsBetween(userId, from.toISOString(), to.toISOString()),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -131,6 +142,7 @@ export function useBlocksForDay(userId: string, date: Date) {
     queryFn: () => listBlocksForDay(userId, dayKey),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -140,6 +152,7 @@ export function useBlocksBetween(userId: string, from: Date, to: Date) {
     queryFn: () => listBlocksBetween(userId, from.toISOString(), to.toISOString()),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -149,6 +162,7 @@ export function useDailyPlan(userId: string, date: Date) {
     queryFn: () => getDailyPlan(userId, formatDayKey(date)),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -158,6 +172,7 @@ export function useWellbeing(userId: string, date: Date) {
     queryFn: () => getCheckin(userId, formatDayKey(date)),
     staleTime: 30_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -167,6 +182,7 @@ export function useWellbeingRange(userId: string, from: Date, to: Date) {
     queryFn: () => listCheckins(userId, formatDayKey(from), formatDayKey(to)),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -176,6 +192,7 @@ export function useGoals(userId: string) {
     queryFn: () => listGoals(userId),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -185,6 +202,7 @@ export function useNotifications(userId: string) {
     queryFn: () => listNotifications(userId),
     staleTime: 15_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -194,6 +212,7 @@ export function useUnreadCount(userId: string) {
     queryFn: () => countUnreadNotifications(userId),
     staleTime: 15_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -203,6 +222,7 @@ export function useDashboardSummary(userId: string) {
     queryFn: () => getDashboardSummary(userId),
     staleTime: 15_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
@@ -212,15 +232,15 @@ export function useDeadlinePressure(userId: string) {
     queryFn: () => calculatePressureFromDb(userId, startOfDay(new Date()), addDays(new Date(), 14)),
     staleTime: 60_000,
     retry: RETRY,
+    enabled: Boolean(userId),
   })
 }
 
+/**
+ * Reuses the `useHabitLogs` cache entry rather than creating a second key for
+ * the same (user, day) range — a single-day range is just a normal range.
+ */
 export function useHabitLogsToday(userId: string, date: Date) {
   const today = formatDayKey(date)
-  return useQuery({
-    queryKey: ['habit-logs', userId, today, today],
-    queryFn: () => listAllHabitLogs(userId, today, today),
-    staleTime: 30_000,
-    retry: RETRY,
-  })
+  return useHabitLogs(userId, today, today)
 }

@@ -25,11 +25,10 @@ import { listCheckins } from './wellbeing-service'
 import { getSettings } from './settings-service'
 import { timeStringToMinutes } from '@/scheduler/time'
 
-const EVENT_BLOCK_TYPE: Record<string, BlockType> = {
-  school: 'school',
-  exam: 'school',
-  commitment: 'commitment',
-  appointment: 'commitment',
+const EVENT_BLOCK_TYPE: Record<CalendarEvent['event_type'], BlockType> = {
+  fixed: 'fixed',
+  appointment: 'appointment',
+  milestone: 'fixed',
   other: 'free',
 }
 
@@ -57,7 +56,7 @@ export async function buildSchedulerInput(
 
   const taskItems: SchedulerTask[] = tasks.map((task: Task) => ({
     id: task.id,
-    subject_id: task.subject_id,
+    category_id: task.category_id,
     title: task.title,
     priority: task.priority,
     difficulty: task.difficulty,
@@ -72,7 +71,7 @@ export async function buildSchedulerInput(
       title: event.title,
       start: new Date(event.start_at),
       end: new Date(event.end_at),
-      block_type: EVENT_BLOCK_TYPE[event.event_type] ?? 'commitment',
+      block_type: EVENT_BLOCK_TYPE[event.event_type] ?? 'fixed',
     })),
     ...existingBlocks
       .filter((b) => b.locked || b.completed || b.skipped)
@@ -107,11 +106,12 @@ export async function buildSchedulerInput(
     settings: {
       awakeStart: settings.wake_time ?? '07:00',
       awakeEnd: settings.bed_time ?? '23:00',
-      preferredStart: settings.preferred_study_start,
-      preferredEnd: settings.preferred_study_end,
+      preferredStart: settings.focus_start,
+      preferredEnd: settings.focus_end,
       breakEveryMinutes: settings.break_every_minutes,
       breakMinutes: settings.break_minutes,
       maxSessionMinutes: settings.max_session_minutes,
+      sleepTargetHours: settings.sleep_target_hours,
       energyPref: settings.energy_pref,
     },
     energyByDay,
@@ -241,15 +241,24 @@ export async function persistPlan(
     cursor = addDays(cursor, 1)
   }
 
+  const capacity = buildCapacityProvider(input)
+  const pressure = calculateDeadlinePressure({
+    tasks: input.tasks,
+    capacity,
+    now: input.now,
+  })
+
   for (const dayKey of dayKeys) {
     const blocks = allKept.filter((b) => b.plan_date === dayKey)
+    const overloadedOnThatDay = pressure.overloading.some(
+      (item) => formatDayKey(item.deadline) === dayKey,
+    )
     const balance = computeDayBalance({
       blocks,
-      sleepTargetHours: 8,
+      sleepTargetHours: input.settings.sleepTargetHours,
       preferredStart: input.settings.preferredStart,
       preferredEnd: input.settings.preferredEnd,
-      deadlinePressureOverloaded: false,
-      childrenHabitsPresent: 0,
+      deadlinePressureOverloaded: pressure.overallOverloaded || overloadedOnThatDay,
       habitsTotal: input.habits.length,
     })
     await upsertDailyPlan(userId, { plan_date: dayKey, balance_score: balance })

@@ -4,16 +4,18 @@ import { kvGetAll, kvSet } from '@/storage/indexeddb'
 /** Which query root keys are valuable to keep for offline use. */
 const OFFLINE_ROOT_KEYS = new Set([
   'profile',
-  'subjects',
-  'tasks',
-  'habits',
   'settings',
+  'categories',
+  'tasks',
   'events',
   'blocks',
+  'daily-plan',
+  'habits',
+  'habit-logs',
+  'goals',
   'pressure',
   'dashboard-summary',
   'wellbeing',
-  'goals',
 ])
 
 const QUERY_CACHE_PREFIX = 'offline:q:'

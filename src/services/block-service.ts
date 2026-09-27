@@ -118,7 +118,7 @@ export async function upsertDailyPlan(
 ): Promise<DailyPlan> {
   const { data, error } = await supabase
     .from('daily_plans')
-    .upsert({ user_id: userId, ...input })
+    .upsert({ user_id: userId, ...input }, { onConflict: 'user_id,plan_date' })
     .select('id, user_id, plan_date, balance_score, generated_at')
     .single()
   if (error) throw error

@@ -3,9 +3,8 @@
  * the storage abstraction. Kept small on purpose.
  */
 
-const DB_NAME = 'luma'
+const DB_NAME = 'morrow'
 const STORE = 'kv'
-const QUEUE_STORE = 'mutations'
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -13,9 +12,6 @@ function openDb(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const db = request.result
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
-      if (!db.objectStoreNames.contains(QUEUE_STORE)) {
-        db.createObjectStore(QUEUE_STORE, { keyPath: 'id' })
-      }
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -36,7 +32,7 @@ async function withStore<T>(
 ): Promise<T> {
   const db = await openDb()
   return new Promise<T>((resolve, reject) => {
-    const tx = db.transaction([STORE, QUEUE_STORE], mode)
+    const tx = db.transaction(STORE, mode)
     const request = fn(tx.objectStore(STORE))
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -84,52 +80,5 @@ export async function kvGetAll(
       keysRequest.onerror = () => reject(keysRequest.error)
     }
     request.onerror = () => reject(request.error)
-  })
-}
-
-export type QueuedMutationRecord = {
-  id: string
-  entity: string
-  operation: 'upsert' | 'delete'
-  record: Record<string, unknown> | null
-  createdAt: string
-}
-
-export async function queueMutationGetAll(): Promise<QueuedMutationRecord[]> {
-  if (!supportsIndexedDB()) return []
-  const db = await openDb()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(QUEUE_STORE, 'readonly')
-    const request = tx.objectStore(QUEUE_STORE).getAll()
-    request.onsuccess = () => resolve((request.result as QueuedMutationRecord[]) ?? [])
-    request.onerror = () => reject(request.error)
-  })
-}
-
-export async function queueMutationAdd(record: QueuedMutationRecord): Promise<void> {
-  if (!supportsIndexedDB()) return
-  const db = await openDb()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(QUEUE_STORE, 'readwrite')
-    tx.objectStore(QUEUE_STORE).put(record)
-    tx.oncomplete = () => {
-      db.close()
-      resolve()
-    }
-    tx.onerror = () => reject(tx.error)
-  })
-}
-
-export async function queueMutationRemove(id: string): Promise<void> {
-  if (!supportsIndexedDB()) return
-  const db = await openDb()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(QUEUE_STORE, 'readwrite')
-    tx.objectStore(QUEUE_STORE).delete(id)
-    tx.oncomplete = () => {
-      db.close()
-      resolve()
-    }
-    tx.onerror = () => reject(tx.error)
   })
 }

@@ -32,7 +32,6 @@ const base = {
   preferredStart: '08:00',
   preferredEnd: '20:00',
   deadlinePressureOverloaded: false,
-  childrenHabitsPresent: 0,
   habitsTotal: 0,
 }
 
@@ -43,11 +42,11 @@ describe('computeDayBalance', () => {
 
   it('scores a healthy, balanced day highly', () => {
     const blocks = [
-      block('school', '08:00', '10:00'),
+      block('fixed', '08:00', '10:00'),
       block('task', '10:30', '12:00'),
       block('break', '12:00', '12:30'),
       block('free', '12:30', '14:00'),
-      block('study', '14:30', '16:00'),
+      block('focus', '14:30', '16:00'),
       block('break', '16:00', '16:15'),
       block('free', '16:15', '18:00'),
     ]
@@ -58,9 +57,9 @@ describe('computeDayBalance', () => {
 
   it('penalizes an overloaded day with no free time', () => {
     const blocks = [
-      block('school', '08:00', '12:00'),
+      block('fixed', '08:00', '12:00'),
       block('task', '12:30', '17:00'),
-      block('study', '17:30', '22:00'),
+      block('focus', '17:30', '22:00'),
     ]
     const score = computeDayBalance({ ...base, blocks, deadlinePressureOverloaded: true })
     const healthy = computeDayBalance({ ...base, blocks })

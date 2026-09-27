@@ -43,7 +43,7 @@ export function energyMatch(difficulty: SchedulerTask['difficulty'], energy: num
   return 5
 }
 
-/** Preferred study-time match for a slot start (minutes of day). */
+/** How well a slot start sits inside the user's preferred focus hours. */
 export function preferredTimeMatch(
   startMinutesOfDay: number,
   preferredStart: string,
@@ -65,11 +65,10 @@ export interface SlotScoringContext {
   preferredEnd: string
   energy: number | null
   prevSameTaskId: string | null
-  prevSameSubjectId: string | null
-  dayStudyMinutes: number
+  prevSameCategoryId: string | null
+  dayFocusMinutes: number
   dailyTargetMinutes: number
-  continuousStudyMinutes: number
-  breaksNeeded: number
+  continuousFocusMinutes: number
   fatigueFromRun: number
 }
 
@@ -95,16 +94,16 @@ export function slotScore(
 
   let continuity = 0
   if (ctx.prevSameTaskId === task.id) continuity = 25
-  else if (task.subject_id && ctx.prevSameSubjectId === task.subject_id) continuity = 10
+  else if (task.category_id && ctx.prevSameCategoryId === task.category_id) continuity = 10
 
   let fatigue = 0
-  if (ctx.continuousStudyMinutes > 0) {
-    fatigue = Math.min(60, ctx.continuousStudyMinutes / 10)
+  if (ctx.continuousFocusMinutes > 0) {
+    fatigue = Math.min(60, ctx.continuousFocusMinutes / 10)
   }
 
   let overload = 0
-  if (ctx.dayStudyMinutes + durationMinutes > ctx.dailyTargetMinutes) {
-    overload = Math.min(80, (ctx.dayStudyMinutes + durationMinutes - ctx.dailyTargetMinutes) / 5)
+  if (ctx.dayFocusMinutes + durationMinutes > ctx.dailyTargetMinutes) {
+    overload = Math.min(80, (ctx.dayFocusMinutes + durationMinutes - ctx.dailyTargetMinutes) / 5)
   }
 
   const nearDeadlineBonus = task.deadline && preferred < 25 ? 15 : 0

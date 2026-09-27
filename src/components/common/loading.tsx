@@ -8,8 +8,10 @@ export function Spinner({ className }: { className?: string }) {
 export function SpinnerScreen({ label }: { label?: string }) {
   return (
     <div className="flex min-h-[50vh] w-full items-center justify-center" role="status" aria-live="polite">
-      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-        <Spinner className="h-6 w-6" />
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl gradient-brand shadow-glow">
+          <Spinner className="h-5 w-5 text-white" />
+        </div>
         {label && <span className="text-sm">{label}</span>}
       </div>
     </div>

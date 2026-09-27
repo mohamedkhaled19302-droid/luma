@@ -1,51 +1,56 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight, CalendarClock, Moon, Plus, Repeat, Trash2, Zap } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  Moon,
+  Plus,
+  Repeat,
+  Trash2,
+  Zap,
+} from 'lucide-react'
+import { addDays, format, set } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Logo } from '@/components/common/logo'
 import { Spinner, SpinnerScreen } from '@/components/common/loading'
 import { EmptyState } from '@/components/common/states'
 import { useAuth } from '@/hooks/use-auth'
 import { useProfileMutations, useSettingsUpdate } from '@/hooks/mutations'
+import { createCategoriesBulk } from '@/services/category-service'
+import { createEvent } from '@/services/event-service'
+import { upsertCheckin } from '@/services/wellbeing-service'
+import { BRAND } from '@/lib/brand'
+import { formatDayKey } from '@/scheduler/time'
 import { cn, formatError } from '@/lib/utils'
+import type { OnboardingData } from '@/types/models'
 
-interface SubjectRow {
-  name: string
-  color: string
-}
+const CATEGORY_COLORS = ['#6366f1', '#0891b2', '#16a34a', '#d97706', '#dc2626', '#db2777', '#8b5cf6']
 
-interface OnboardingState {
-  full_name: string
-  school_year: string
-  subjects: SubjectRow[]
-  wake_time: string
-  bed_time: string
-  preferred_study_start: string
-  preferred_study_end: string
-  max_session_minutes: string
-  sleep_target_hours: string
-}
+/** Sensible starting points — a mix of work, health, home and personal. */
+const CATEGORY_IDEAS = ['Work', 'Health', 'Home', 'Learning', 'Family', 'Side project', 'Money', 'Errands']
 
-const SUBJECT_COLORS = ['#4f46e5', '#0891b2', '#16a34a', '#d97706', '#dc2626', '#db2777', '#7c3aed']
-const SCHOOL_YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'College', 'Masters', 'Other']
-const STEP_TITLES = ['About you', 'Your subjects', 'Your typical week', 'Almost done']
+const WEEKDAYS = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+]
+
+const STEP_TITLES = ['About you', 'Your categories', 'Your week', 'Almost done']
 const STEP_DESCRIPTIONS = [
-  'Tell us a little about you so LUMA can plan around your real life.',
-  'The subjects you\u2019re studying this term. Color-code them so your plan is easy to read at a glance.',
-  'LUMA builds your day around your natural rhythm. Tweak these whenever you like.',
-  'One last look before LUMA quietly holds the details.',
+  `Tell us a little about you so ${BRAND.name} can plan around your real life.`,
+  'The areas of your life you want to keep separate. Colour-code them so your plan is easy to read at a glance.',
+  `${BRAND.name} builds your day around your natural rhythm. Tweak these whenever you like.`,
+  'One last look before we quietly take care of the rest.',
 ]
 const STEP_COUNT = STEP_TITLES.length
 
@@ -56,6 +61,44 @@ const CREATE_SUMMARY = [
   { icon: Moon, text: 'Make sure you truly rest' },
 ]
 
+type EditableCommitment = OnboardingData['commitments'][number]
+
+const DEFAULT_STATE: OnboardingData = {
+  full_name: '',
+  categories: [
+    { name: 'Work', color: CATEGORY_COLORS[0] ?? '#6366f1' },
+    { name: 'Health', color: CATEGORY_COLORS[2] ?? '#16a34a' },
+    { name: 'Home', color: CATEGORY_COLORS[1] ?? '#0891b2' },
+  ],
+  availableStart: '08:00',
+  availableEnd: '20:00',
+  focusStart: '09:00',
+  focusEnd: '18:00',
+  sleepTarget: 8,
+  maxSessionMinutes: 90,
+  commitments: [],
+  energy: null,
+  stress: null,
+}
+
+/** Repeat the coming week's occurrence of `weekday` as a concrete date. */
+function upcomingDateFor(weekday: number, offsetWeeks = 0): Date {
+  const today = new Date()
+  const todayWeekday = today.getDay()
+  const delta = (weekday - todayWeekday + 7) % 7
+  return addDays(today, offsetWeeks * 7 + delta)
+}
+
+function occurrenceAt(weekday: number, time: string, offsetWeeks = 0): string {
+  const [hour = 0, minute = 0] = time.split(':').map(Number)
+  return set(upcomingDateFor(weekday, offsetWeeks), {
+    hours: hour,
+    minutes: minute,
+    seconds: 0,
+    milliseconds: 0,
+  }).toISOString()
+}
+
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
@@ -63,47 +106,70 @@ export default function OnboardingPage() {
   const settingsMutation = useSettingsUpdate(user?.id ?? '')
 
   const [step, setStep] = useState(0)
-  const [state, setState] = useState<OnboardingState>({
-    full_name: '',
-    school_year: '',
-    subjects: [],
-    wake_time: '07:00',
-    bed_time: '23:00',
-    preferred_study_start: '08:00',
-    preferred_study_end: '20:00',
-    max_session_minutes: '90',
-    sleep_target_hours: '8',
-  })
+  const [state, setState] = useState<OnboardingData>(DEFAULT_STATE)
   const [saving, setSaving] = useState(false)
 
   if (loading) return <SpinnerScreen label="Loading your space" />
   if (!user) return <Navigate to="/auth/sign-in" replace />
 
-  function setField<K extends keyof OnboardingState>(key: K, value: OnboardingState[K]) {
+  function setField<K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) {
     setState((prev) => ({ ...prev, [key]: value }))
   }
 
-  function addSubject() {
+  function nextCategoryColor(count: number): string {
+    return CATEGORY_COLORS[count % CATEGORY_COLORS.length] ?? '#6366f1'
+  }
+
+  function appendCategory(name: string, color?: string) {
     setState((prev) => ({
       ...prev,
-      subjects: [
-        ...prev.subjects,
-        { name: '', color: SUBJECT_COLORS[prev.subjects.length % SUBJECT_COLORS.length] ?? '#4f46e5' },
+      categories: [
+        ...prev.categories,
+        { name, color: color ?? nextCategoryColor(prev.categories.length) },
       ],
     }))
   }
 
-  function updateSubject(index: number, patch: Partial<SubjectRow>) {
+  function addCategory() {
+    appendCategory('')
+  }
+
+  function updateCategory(index: number, patch: Partial<OnboardingData['categories'][number]>) {
     setState((prev) => ({
       ...prev,
-      subjects: prev.subjects.map((subject, i) => (i === index ? { ...subject, ...patch } : subject)),
+      categories: prev.categories.map((category, i) =>
+        i === index ? { ...category, ...patch } : category,
+      ),
     }))
   }
 
-  function removeSubject(index: number) {
+  function removeCategory(index: number) {
     setState((prev) => ({
       ...prev,
-      subjects: prev.subjects.filter((_, i) => i !== index),
+      categories: prev.categories.filter((_, i) => i !== index),
+    }))
+  }
+
+  function addCommitment() {
+    setState((prev) => ({
+      ...prev,
+      commitments: [...prev.commitments, { title: '', weekday: 1, start: '09:00', end: '10:00' }],
+    }))
+  }
+
+  function updateCommitment(index: number, patch: Partial<EditableCommitment>) {
+    setState((prev) => ({
+      ...prev,
+      commitments: prev.commitments.map((commitment, i) =>
+        i === index ? { ...commitment, ...patch } : commitment,
+      ),
+    }))
+  }
+
+  function removeCommitment(index: number) {
+    setState((prev) => ({
+      ...prev,
+      commitments: prev.commitments.filter((_, i) => i !== index),
     }))
   }
 
@@ -119,20 +185,59 @@ export default function OnboardingPage() {
     if (!user) return
     setSaving(true)
     try {
-      await profileMutation.mutateAsync({
-        full_name: state.full_name.trim(),
-        school_year: state.school_year || null,
-      })
+      await profileMutation.mutateAsync({ full_name: state.full_name.trim() })
+
+      const namedCategories = state.categories.filter((category) => category.name.trim() !== '')
+      if (namedCategories.length > 0) {
+        await createCategoriesBulk(
+          user.id,
+          namedCategories.map((category) => ({
+            name: category.name.trim(),
+            color: category.color,
+          })),
+        )
+      }
+
+      for (const commitment of state.commitments) {
+        if (commitment.title.trim() === '') continue
+        // Lay the first four occurrences down as locked events so the scheduler
+        // has something concrete to plan around for the next few weeks.
+        for (let week = 0; week < 4; week += 1) {
+          await createEvent(user.id, {
+            title: commitment.title.trim(),
+            description: null,
+            start_at: occurrenceAt(commitment.weekday, commitment.start, week),
+            end_at: occurrenceAt(commitment.weekday, commitment.end, week),
+            all_day: false,
+            event_type: 'fixed',
+            locked: true,
+            location: null,
+            color: '#10b981',
+          })
+        }
+      }
+
       await settingsMutation.mutateAsync({
-        wake_time: state.wake_time,
-        bed_time: state.bed_time,
-        preferred_study_start: state.preferred_study_start,
-        preferred_study_end: state.preferred_study_end,
-        max_session_minutes: Number(state.max_session_minutes),
-        sleep_target_hours: Number(state.sleep_target_hours),
+        wake_time: state.availableStart,
+        bed_time: state.availableEnd,
+        focus_start: state.focusStart,
+        focus_end: state.focusEnd,
+        max_session_minutes: Number(state.maxSessionMinutes),
+        sleep_target_hours: Number(state.sleepTarget),
         onboarded: true,
       })
-      toast.success('Welcome to LUMA')
+
+      if (state.energy != null || state.stress != null) {
+        await upsertCheckin(user.id, {
+          checkin_date: formatDayKey(new Date()),
+          energy: state.energy,
+          stress: state.stress,
+          sleep_hours: null,
+          note: null,
+        })
+      }
+
+      toast.success(`Welcome to ${BRAND.name}`)
       navigate('/dashboard')
     } catch (error) {
       toast.error(formatError(error))
@@ -144,12 +249,12 @@ export default function OnboardingPage() {
   const nextDisabled = step === 0 && state.full_name.trim().length === 0
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <main className="relative flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-xl">
         <div className="mb-6 flex justify-center">
           <Logo />
         </div>
-        <Card>
+        <Card className="shadow-soft-lg">
           <CardHeader className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -158,194 +263,321 @@ export default function OnboardingPage() {
                   Step {step + 1} of {STEP_COUNT}
                 </span>
               </div>
-              <Progress value={((step + 1) / STEP_COUNT) * 100} />
+              <Progress value={((step + 1) / STEP_COUNT) * 100} className="h-2" />
             </div>
-            <div className="space-y-1">
+            <div key={step} className="animate-fade-up space-y-1">
               <CardTitle className="text-2xl">{STEP_TITLES[step]}</CardTitle>
               <CardDescription>{STEP_DESCRIPTIONS[step]}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {step === 0 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full name</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    autoComplete="name"
-                    placeholder="Ava Chen"
-                    value={state.full_name}
-                    onChange={(event) => setField('full_name', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>School year</Label>
-                  <Select
-                    value={state.school_year || undefined}
-                    onValueChange={(value) => setField('school_year', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pick your year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SCHOOL_YEARS.map((year) => (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {step === 1 && (
-              <div className="space-y-4">
-                {state.subjects.length === 0 ? (
-                  <EmptyState
-                    icon={<Plus className="h-6 w-6" />}
-                    title="Add the subjects you're studying this term."
-                    action={
-                      <Button size="sm" onClick={addSubject}>
-                        <Plus className="h-4 w-4" />
-                        Add a subject
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {state.subjects.map((subject, index) => (
-                      <div key={index} className="flex items-start gap-3 rounded-lg border p-3">
-                        <span
-                          className="mt-2.5 h-4 w-4 shrink-0 rounded-full"
-                          style={{ backgroundColor: subject.color }}
-                        />
-                        <div className="flex-1 space-y-2">
-                          <Input
-                            value={subject.name}
-                            placeholder="e.g. Biology"
-                            onChange={(event) => updateSubject(index, { name: event.target.value })}
-                          />
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {SUBJECT_COLORS.map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                aria-label={`Use color ${color}`}
-                                className={cn(
-                                  'h-5 w-5 rounded-full transition',
-                                  subject.color === color && 'ring-2 ring-ring ring-offset-2 ring-offset-background',
-                                )}
-                                style={{ backgroundColor: color }}
-                                onClick={() => updateSubject(index, { color })}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Remove subject"
-                          onClick={() => removeSubject(index)}
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button type="button" variant="outline" onClick={addSubject}>
-                      <Plus className="h-4 w-4" />
-                      Add another subject
-                    </Button>
+            <div key={`step-${step}`} className="animate-fade-up">
+              {step === 0 && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">What should we call you?</Label>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      autoComplete="name"
+                      placeholder="Ava Chen"
+                      value={state.full_name}
+                      onChange={(event) => setField('full_name', event.target.value)}
+                    />
                   </div>
-                )}
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="wakeTime">Wake time</Label>
-                  <Input
-                    id="wakeTime"
-                    type="time"
-                    value={state.wake_time}
-                    onChange={(event) => setField('wake_time', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bedTime">Bed time</Label>
-                  <Input
-                    id="bedTime"
-                    type="time"
-                    value={state.bed_time}
-                    onChange={(event) => setField('bed_time', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="studyStart">Study start</Label>
-                  <Input
-                    id="studyStart"
-                    type="time"
-                    value={state.preferred_study_start}
-                    onChange={(event) => setField('preferred_study_start', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="studyEnd">Study end</Label>
-                  <Input
-                    id="studyEnd"
-                    type="time"
-                    value={state.preferred_study_end}
-                    onChange={(event) => setField('preferred_study_end', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="maxSession">Session length (max, minutes)</Label>
-                  <Input
-                    id="maxSession"
-                    type="number"
-                    min={15}
-                    step={15}
-                    value={state.max_session_minutes}
-                    onChange={(event) => setField('max_session_minutes', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sleepTarget">Sleep target (hours)</Label>
-                  <Input
-                    id="sleepTarget"
-                    type="number"
-                    min={1}
-                    max={12}
-                    step={1}
-                    value={state.sleep_target_hours}
-                    onChange={(event) => setField('sleep_target_hours', event.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="space-y-6">
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  You&rsquo;ve done the hard part. From here, LUMA quietly takes care of the rest
-                  &mdash; so you can stop juggling it all in your head and get on with living your
-                  life.
-                </p>
-                <ul className="space-y-3">
-                  {CREATE_SUMMARY.map(({ icon: Icon, text }) => (
-                    <li key={text} className="flex items-center gap-3 text-sm">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                        <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+                  <div className="space-y-2">
+                    <Label htmlFor="energy">How is your energy right now?</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="energy"
+                        type="range"
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="h-2 flex-1 accent-primary"
+                        value={state.energy ?? 3}
+                        onChange={(event) => setField('energy', Number(event.target.value))}
+                      />
+                      <span className="w-10 text-right text-sm font-medium text-muted-foreground">
+                        {state.energy ?? 3}/5
                       </span>
-                      {text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      You can skip this — it just helps {BRAND.name} get the tone right on day one.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {step === 1 && (
+                <div className="space-y-4">
+                  {state.categories.length === 0 ? (
+                    <EmptyState
+                      icon={<Plus className="h-6 w-6" />}
+                      title="Add the areas of your life you want to keep separate."
+                      description="Work, health, home, a side project — whatever fits."
+                      action={
+                        <Button size="sm" onClick={addCategory}>
+                          <Plus className="h-4 w-4" />
+                          Add a category
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {state.categories.map((category, index) => (
+                        <div key={index} className="flex items-start gap-3 rounded-lg border p-3">
+                          <span
+                            className="mt-2.5 h-4 w-4 shrink-0 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <div className="flex-1 space-y-2">
+                            <Input
+                              value={category.name}
+                              placeholder="e.g. Deep work"
+                              onChange={(event) => updateCategory(index, { name: event.target.value })}
+                            />
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {CATEGORY_COLORS.map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  aria-label={`Use color ${color}`}
+                                  className={cn(
+                                    'h-5 w-5 rounded-full transition',
+                                    category.color === color &&
+                                      'ring-2 ring-ring ring-offset-2 ring-offset-background',
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                  onClick={() => updateCategory(index, { color })}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Remove category"
+                            onClick={() => removeCategory(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex flex-wrap gap-1.5">
+                        {CATEGORY_IDEAS.filter(
+                          (idea) => !state.categories.some((c) => c.name.toLowerCase() === idea.toLowerCase()),
+                        ).map((idea) => (
+                          <button
+                            key={idea}
+                            type="button"
+                            onClick={() => appendCategory(idea)}
+                            className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                          >
+                            <Plus className="mr-0.5 inline h-3 w-3" aria-hidden="true" />
+                            {idea}
+                          </button>
+                        ))}
+                      </div>
+                      <Button type="button" variant="outline" onClick={addCategory}>
+                        <Plus className="h-4 w-4" />
+                        Add another category
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="availableStart">Day starts</Label>
+                      <Input
+                        id="availableStart"
+                        type="time"
+                        value={state.availableStart}
+                        onChange={(event) => setField('availableStart', event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="availableEnd">Day ends</Label>
+                      <Input
+                        id="availableEnd"
+                        type="time"
+                        value={state.availableEnd}
+                        onChange={(event) => setField('availableEnd', event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="focusStart">Focus hours start</Label>
+                      <Input
+                        id="focusStart"
+                        type="time"
+                        value={state.focusStart}
+                        onChange={(event) => setField('focusStart', event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="focusEnd">Focus hours end</Label>
+                      <Input
+                        id="focusEnd"
+                        type="time"
+                        value={state.focusEnd}
+                        onChange={(event) => setField('focusEnd', event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxSession">Session length (max, minutes)</Label>
+                      <Input
+                        id="maxSession"
+                        type="number"
+                        min={15}
+                        step={15}
+                        value={String(state.maxSessionMinutes)}
+                        onChange={(event) => setField('maxSessionMinutes', Number(event.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sleepTarget">Sleep target (hours)</Label>
+                      <Input
+                        id="sleepTarget"
+                        type="number"
+                        min={1}
+                        max={12}
+                        step={1}
+                        value={String(state.sleepTarget)}
+                        onChange={(event) => setField('sleepTarget', Number(event.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Fixed commitments</p>
+                        <p className="text-xs text-muted-foreground">
+                          Anything recurring you can&apos;t move: work, training, family, appointments.
+                        </p>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" onClick={addCommitment}>
+                        <Plus className="h-4 w-4" />
+                        Add
+                      </Button>
+                    </div>
+                    {state.commitments.length === 0 ? (
+                      <p className="rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                        None yet — you can add these any time from the planner.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {state.commitments.map((commitment, index) => (
+                          <div
+                            key={index}
+                            className="grid grid-cols-12 items-end gap-2 rounded-lg border p-3"
+                          >
+                            <div className="col-span-12 space-y-1.5 sm:col-span-5">
+                              <Label className="text-xs" htmlFor={`commitment-title-${index}`}>
+                                What
+                              </Label>
+                              <Input
+                                id={`commitment-title-${index}`}
+                                value={commitment.title}
+                                placeholder="Standup"
+                                onChange={(event) =>
+                                  updateCommitment(index, { title: event.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="col-span-4 space-y-1.5 sm:col-span-3">
+                              <Label className="text-xs" htmlFor={`commitment-day-${index}`}>
+                                Day
+                              </Label>
+                              <select
+                                id={`commitment-day-${index}`}
+                                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                                value={commitment.weekday}
+                                onChange={(event) =>
+                                  updateCommitment(index, { weekday: Number(event.target.value) })
+                                }
+                              >
+                                {WEEKDAYS.map((day) => (
+                                  <option key={day.value} value={day.value}>
+                                    {day.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-span-4 space-y-1.5">
+                              <Label className="text-xs" htmlFor={`commitment-start-${index}`}>
+                                From
+                              </Label>
+                              <Input
+                                id={`commitment-start-${index}`}
+                                type="time"
+                                value={commitment.start}
+                                onChange={(event) =>
+                                  updateCommitment(index, { start: event.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="col-span-3 space-y-1.5">
+                              <Label className="text-xs" htmlFor={`commitment-end-${index}`}>
+                                To
+                              </Label>
+                              <Input
+                                id={`commitment-end-${index}`}
+                                type="time"
+                                value={commitment.end}
+                                onChange={(event) =>
+                                  updateCommitment(index, { end: event.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="col-span-1 flex justify-end pb-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Remove ${commitment.title || 'commitment'}`}
+                                onClick={() => removeCommitment(index)}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    You&apos;ve done the hard part. From here, {BRAND.name} quietly takes care of the rest
+                    — so you can stop juggling it all in your head and get on with living your life.
+                  </p>
+                  <ul className="space-y-3">
+                    {CREATE_SUMMARY.map(({ icon: Icon, text }) => (
+                      <li key={text} className="flex items-center gap-3 text-sm">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                          <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+                        </span>
+                        {text}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="rounded-lg bg-muted/50 px-3.5 py-3 text-xs text-muted-foreground">
+                    Starting {format(new Date(), 'EEEE d MMMM')} · {state.categories.length}{' '}
+                    categor{state.categories.length === 1 ? 'y' : 'ies'} · focus window{' '}
+                    {state.focusStart}–{state.focusEnd}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-between border-t pt-6">
               <Button

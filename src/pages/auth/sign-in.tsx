@@ -2,98 +2,93 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { AuthLayout } from '@/layouts/auth-layout'
+import { BRAND } from '@/lib/brand'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Logo } from '@/components/common/logo'
 import { Spinner } from '@/components/common/loading'
-import { signInWithEmail } from '@/auth/auth-service'
 import { formatError } from '@/lib/utils'
+import { signInWithEmail } from '@/auth/auth-service'
 
 export default function SignInPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setLoading(true)
+    setSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      toast.success('Welcome back to LUMA')
+      toast.success(`Welcome back to ${BRAND.name}`)
       navigate('/dashboard')
     } catch (error) {
       toast.error(formatError(error) ?? 'Failed to sign in')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex justify-center">
-          <Logo />
-        </div>
-        <Card>
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Plan your day and protect your energy.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@school.edu"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    to="/auth/forgot-password"
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Spinner className="h-4 w-4" />}
-                Sign in
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-        <p className="text-center text-sm text-muted-foreground">
-          New here?{' '}
-          <Link to="/auth/sign-up" className="font-medium text-primary hover:underline">
-            Create an account
-          </Link>
-        </p>
-        <p className="text-center text-xs">
-          <Link to="/landing" className="text-muted-foreground hover:text-foreground hover:underline">
-            Back to homepage
-          </Link>
+    <AuthLayout>
+      <div className="space-y-1.5 text-center lg:text-left">
+        <h1 className="font-display text-3xl font-bold tracking-tight">
+          Welcome back
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Plan your day and protect your energy.
         </p>
       </div>
-    </main>
+      <Card className="shadow-soft-md">
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  to="/auth/forgot-password"
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+              {submitting && <Spinner className="h-4 w-4" />}
+              Sign in
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      <p className="text-center text-sm text-muted-foreground">
+        New here?{' '}
+        <Link to="/auth/sign-up" className="font-medium text-primary hover:underline">
+          Create an account
+        </Link>
+      </p>
+    </AuthLayout>
   )
 }

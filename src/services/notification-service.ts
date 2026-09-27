@@ -1,7 +1,7 @@
 import { supabase } from '@/database/client'
 import type { AppNotification, NotificationType } from '@/types/models'
 
-export const NOTIFICATION_COLUMNS = 'id, user_id, type, title, body, data, read, created_at'
+export const NOTIFICATION_COLUMNS = 'id, user_id, type, title, body, data, read, key, deadline_at, created_at'
 
 export async function listNotifications(userId: string): Promise<AppNotification[]> {
   const { data, error } = await supabase
@@ -21,6 +21,8 @@ export async function createNotification(
     title: string
     body: string
     data?: Record<string, unknown> | null
+    key?: string | null
+    deadline_at?: string | null
   },
 ): Promise<AppNotification> {
   const { data, error } = await supabase
@@ -30,6 +32,17 @@ export async function createNotification(
     .single()
   if (error) throw error
   return data
+}
+
+export async function listSentNotificationKeys(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('key')
+    .eq('user_id', userId)
+    .not('key', 'is', null)
+    .limit(500)
+  if (error) throw error
+  return (data ?? []).map((row) => row.key as string)
 }
 
 export async function markNotificationRead(

@@ -19,6 +19,7 @@ function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
       breakEveryMinutes: 90,
       breakMinutes: 15,
       maxSessionMinutes: 90,
+  sleepTargetHours: 8,
       energyPref: true,
     },
     energyByDay: new Map(),
@@ -31,7 +32,7 @@ function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
 
 const task = (overrides: Partial<SchedulerTask> = {}): SchedulerTask => ({
   id: 't1',
-  subject_id: null,
+  category_id: null,
   title: 'Write essay',
   priority: 'high',
   difficulty: 'medium',

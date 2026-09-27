@@ -1,14 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
 import { VitePWA } from 'vite-plugin-pwa'
 import type { ManifestOptions } from 'vite-plugin-pwa'
+import { aiDevApi } from './server/dev-api'
 
 const manifest: Partial<ManifestOptions> = {
-  name: 'LUMA - Plan your life. Not just your tasks.',
-  short_name: 'LUMA',
+  name: 'Morrow - Plan a day that fits your life',
+  short_name: 'Morrow',
   description:
-    'LUMA helps students balance academics, deadlines, habits, sleep and free time.',
+    'Morrow is a personal daily planner that adapts to how you live: tasks, schedule, habits and goals in one calm plan.',
   theme_color: '#0f172a',
   background_color: '#f8fafc',
   display: 'standalone',
@@ -27,10 +28,17 @@ const manifest: Partial<ManifestOptions> = {
   ],
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load every variable (including non-VITE_ ones) so the dev middleware can
+  // read OPENROUTER_API_KEY server-side. Non-prefixed variables are never
+  // exposed to the client bundle.
+  const env = loadEnv(mode, process.cwd(), '')
+
+  return {
   plugins: [
     react(),
     tsconfigPaths(),
+    aiDevApi(env),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
@@ -38,7 +46,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/auth\//],
+        navigateFallbackDenylist: [/^\/auth\//, /^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -78,7 +86,20 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    port: 5173,
-  },
+    server: {
+      port: 5173,
+      allowedHosts: [
+        '.trycloudflare.com',
+        '.localtest.me',
+        'luma.local',
+      ],
+    },
+    preview: {
+      port: 5199,
+      strictPort: true,
+      allowedHosts: [
+        '.trycloudflare.com',
+      ],
+    },
+  }
 })

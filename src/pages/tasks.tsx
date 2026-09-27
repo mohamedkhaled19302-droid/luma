@@ -14,9 +14,9 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
-import { useSubjects, useTasks } from '@/hooks/queries'
+import { useCategories, useTasks } from '@/hooks/queries'
 import { useTaskMutations } from '@/hooks/mutations'
-import type { Difficulty, Priority, Subject, Task } from '@/types/models'
+import type { Category, Difficulty, Priority, Task } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -47,7 +47,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { EmptyState } from '@/components/common/states'
+import { EmptyState, ErrorState } from '@/components/common/states'
 import { Spinner } from '@/components/common/loading'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatError } from '@/lib/utils'
@@ -56,7 +56,7 @@ type Filter = 'all' | 'open' | 'done' | 'missed'
 
 interface TaskFormValues {
   title: string
-  subject_id: string
+  category_id: string
   priority: Priority
   difficulty: Difficulty
   estimated_minutes: string
@@ -65,10 +65,10 @@ interface TaskFormValues {
 }
 
 const priorityTokens: Record<Priority, string> = {
-  critical: 'bg-red-500/10 text-red-500 border-red-500/20',
-  high: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-  medium: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-  low: 'bg-sky-500/10 text-sky-500 border-sky-500/20',
+  critical: 'bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-300',
+  high: 'bg-orange-500/10 text-orange-700 border-orange-500/20 dark:text-orange-300',
+  medium: 'bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-300',
+  low: 'bg-sky-500/10 text-sky-700 border-sky-500/20 dark:text-sky-300',
 }
 
 const emptyCopy: Record<Filter, { title: string; description: string }> = {
@@ -81,20 +81,20 @@ const emptyCopy: Record<Filter, { title: string; description: string }> = {
 function TaskFormDialog({
   open,
   onOpenChange,
-  subjects,
+  categories,
   task,
   submitting,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  subjects: Subject[]
+  categories: Category[]
   task: Task | null
   submitting: boolean
   onSubmit: (values: TaskFormValues) => void
 }) {
   const [title, setTitle] = useState('')
-  const [subjectId, setSubjectId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [estimatedMinutes, setEstimatedMinutes] = useState('')
@@ -104,7 +104,7 @@ function TaskFormDialog({
   useEffect(() => {
     if (!open) return
     setTitle(task?.title ?? '')
-    setSubjectId(task?.subject_id ?? '')
+    setCategoryId(task?.category_id ?? '')
     setPriority(task?.priority ?? 'medium')
     setDifficulty(task?.difficulty ?? 'medium')
     setEstimatedMinutes(task ? String(task.estimated_minutes) : '')
@@ -116,7 +116,7 @@ function TaskFormDialog({
     event.preventDefault()
     onSubmit({
       title,
-      subject_id: subjectId,
+      category_id: categoryId,
       priority,
       difficulty,
       estimated_minutes: estimatedMinutes,
@@ -147,20 +147,20 @@ function TaskFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Subject</Label>
-              <Select value={subjectId} onValueChange={setSubjectId}>
+              <Label>Category</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="No subject" />
+                  <SelectValue placeholder="No category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {subjects.map((subject) => (
-                    <SelectItem key={subject.id} value={subject.id}>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
                       <span className="inline-flex items-center gap-2">
                         <span
                           className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: subject.color }}
+                          style={{ backgroundColor: category.color }}
                         />
-                        {subject.name}
+                        {category.name}
                       </span>
                     </SelectItem>
                   ))}
@@ -248,16 +248,18 @@ export default function TasksPage() {
   const { user } = useAuth()
   const userId = user?.id
   const tasks = useTasks(userId ?? '')
-  const subjects = useSubjects(userId ?? '')
+  const categories = useCategories(userId ?? '')
   const tm = useTaskMutations(userId ?? '')
   const [filter, setFilter] = useState<Filter>('all')
   const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; task: Task } | null>(null)
 
-  const isLoading = tasks.isLoading || subjects.isLoading
+  const isLoading = tasks.isLoading || categories.isLoading
   const allTasks = tasks.data ?? []
   const count = allTasks.length
 
-  const subjectMap = new Map((subjects.data ?? []).map((s) => [s.id, s] as [string, Subject]))
+  const categoryMap = new Map(
+    (categories.data ?? []).map((category) => [category.id, category] as [string, Category]),
+  )
 
   const filtered = allTasks.filter((task) => {
     if (filter === 'open') return task.status === 'todo' || task.status === 'in_progress'
@@ -270,7 +272,7 @@ export default function TasksPage() {
     tm.create.mutate(
       {
         title: values.title,
-        subject_id: values.subject_id || null,
+        category_id: values.category_id || null,
         priority: values.priority,
         difficulty: values.difficulty,
         estimated_minutes: Number(values.estimated_minutes) || 30,
@@ -295,7 +297,7 @@ export default function TasksPage() {
         id: task.id,
         fields: {
           title: values.title,
-          subject_id: values.subject_id || null,
+          category_id: values.category_id || null,
           priority: values.priority,
           difficulty: values.difficulty,
           estimated_minutes: Number(values.estimated_minutes) || task.estimated_minutes,
@@ -361,7 +363,7 @@ export default function TasksPage() {
 
   if (!userId) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
         <EmptyState title="Sign in to manage your tasks" />
       </div>
     )
@@ -369,9 +371,9 @@ export default function TasksPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
         <div className="flex items-center justify-between gap-4">
-          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-9 w-44" />
           <Skeleton className="h-9 w-28" />
         </div>
         <Skeleton className="h-10 w-full" />
@@ -384,11 +386,19 @@ export default function TasksPage() {
     )
   }
 
+  if (tasks.error) {
+    return (
+      <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+        <ErrorState message={formatError(tasks.error)} onRetry={() => void tasks.refetch()} />
+      </div>
+    )
+  }
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="stagger-fade mx-auto max-w-3xl space-y-5 px-4 py-4">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
+          <h1 className="font-display font-bold tracking-tight text-2xl sm:text-3xl">Tasks</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {count} {count === 1 ? 'task' : 'tasks'} on your list
           </p>
@@ -397,7 +407,7 @@ export default function TasksPage() {
           <Plus className="h-4 w-4" aria-hidden="true" />
           New task
         </Button>
-      </div>
+      </header>
 
       <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)}>
         <TabsList className="grid w-full grid-cols-4">
@@ -412,37 +422,50 @@ export default function TasksPage() {
           ) : (
             <div className="space-y-3">
               {filtered.map((task) => {
-                const subject = subjectMap.get(task.subject_id ?? '')
+                const category = categoryMap.get(task.category_id ?? '')
                 return (
-                  <Card key={task.id} className={cn(task.status === 'done' && 'opacity-70')}>
+                  <Card
+                    key={task.id}
+                    className={cn(
+                      'group relative overflow-hidden transition-all duration-200 hover:border-primary/25 hover:shadow-soft-md',
+                      task.status === 'done' && 'opacity-70',
+                    )}
+                  >
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute inset-y-0 left-0 w-1 bg-primary/20 transition-colors dark:bg-primary/30',
+                        task.status === 'done' && 'bg-emerald-500/70',
+                      )}
+                    />
                     <CardContent className="flex items-center gap-3 p-4">
                       <Checkbox
                         checked={task.status === 'done'}
                         onCheckedChange={() => toggleTask(task)}
                         aria-label={`Mark ${task.title} done`}
                       />
-                      {subject && (
+                      {category && (
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: subject.color }}
+                          style={{ backgroundColor: category.color }}
                         />
                       )}
                       <div className="min-w-0 flex-1">
                         <p
                           className={cn(
-                            'truncate text-sm font-medium',
+                            'truncate text-sm font-medium leading-snug',
                             task.status === 'done' && 'text-muted-foreground line-through',
                           )}
                         >
                           {task.title}
                         </p>
                         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                          {subject && <span>{subject.name}</span>}
+                          {category && <span>{category.name}</span>}
                           {task.deadline && (
                             <span
                               className={cn(
                                 'inline-flex items-center gap-1',
-                                isOverdue(task) && 'font-medium text-red-500',
+                                isOverdue(task) && 'font-medium text-red-600 dark:text-red-400',
                               )}
                             >
                               <CalendarClock className="h-3 w-3" aria-hidden="true" />
@@ -502,7 +525,7 @@ export default function TasksPage() {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
+                            className="text-red-700 focus:text-red-700 dark:text-red-400 dark:focus:text-red-400"
                             onClick={() => deleteTask(task)}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -525,7 +548,7 @@ export default function TasksPage() {
           onOpenChange={(open) => {
             if (!open) setDialog(null)
           }}
-          subjects={subjects.data ?? []}
+          categories={categories.data ?? []}
           task={null}
           submitting={tm.create.isPending}
           onSubmit={submitCreate}
@@ -537,7 +560,7 @@ export default function TasksPage() {
           onOpenChange={(open) => {
             if (!open) setDialog(null)
           }}
-          subjects={subjects.data ?? []}
+          categories={categories.data ?? []}
           task={dialog.task}
           submitting={tm.update.isPending}
           onSubmit={submitEdit}

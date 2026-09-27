@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { isOnline, subscribeOnline } from '@/services/offline-service'
+import { isOnlineNow, subscribeOnline } from '@/lib/sync-queue'
 
 /**
  * Reactive online/offline state via useSyncExternalStore.
@@ -8,7 +8,7 @@ import { isOnline, subscribeOnline } from '@/services/offline-service'
 export function useOnlineStatus(): boolean {
   return useSyncExternalStore(
     subscribeOnline,
-    () => isOnline(),
+    () => isOnlineNow(),
     () => true,
   )
 }

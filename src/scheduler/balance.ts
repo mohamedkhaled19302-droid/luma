@@ -6,7 +6,6 @@ export interface BalanceInput {
   preferredStart: string
   preferredEnd: string
   deadlinePressureOverloaded: boolean
-  childrenHabitsPresent: number
   habitsTotal: number
 }
 
@@ -19,7 +18,7 @@ export function computeDayBalance(input: BalanceInput): number {
 
   if (blocks.length === 0) return 50
 
-  let totalStudyMin = 0
+  let totalFocusMin = 0
   let totalFreeMin = 0
   let totalBreakMin = 0
   let awakeMin = 0
@@ -34,12 +33,11 @@ export function computeDayBalance(input: BalanceInput): number {
 
     switch (block.block_type) {
       case 'task':
-      case 'study':
-      case 'school':
-        totalStudyMin += len
+      case 'focus':
+        totalFocusMin += len
         break
       case 'habit':
-        totalStudyMin += len
+        totalFocusMin += len
         plannedHabits += 1
         break
       case 'break':
@@ -57,16 +55,16 @@ export function computeDayBalance(input: BalanceInput): number {
     }
   }
 
-  // Study load: comfortable capacity is ~60% of awake time. Cap at 100.
-  const safeStudyMin = Math.max(180, awakeMin * 0.5)
-  const loadScore = Math.max(0, Math.min(40, 40 * (1 - Math.max(0, totalStudyMin - safeStudyMin) / 240)))
+  // Focus load: comfortable capacity is ~50% of awake time. Cap at 100.
+  const safeFocusMin = Math.max(180, awakeMin * 0.5)
+  const loadScore = Math.max(0, Math.min(40, 40 * (1 - Math.max(0, totalFocusMin - safeFocusMin) / 240)))
 
   // Free time score: want meaningful free time (>= 2h).
   const freeScore = Math.min(20, Math.round((totalFreeMin / 120) * 20))
 
-  // Break coverage: a break every ~2h of study is healthy.
-  const breakScore = totalStudyMin > 120
-    ? Math.min(15, Math.round((totalBreakMin / (totalStudyMin / 120)) * 15))
+  // Break coverage: a break every ~2h of focused work is healthy.
+  const breakScore = totalFocusMin > 120
+    ? Math.min(15, Math.round((totalBreakMin / (totalFocusMin / 120)) * 15))
     : 15
 
   // Habit coverage.

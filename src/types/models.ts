@@ -1,18 +1,26 @@
 export type Priority = 'low' | 'medium' | 'high' | 'critical'
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'missed'
+export type PlanningStyleId = 'structured' | 'flexible' | 'balanced' | 'goal-focused' | 'minimal'
+export type PlanningDetail = 'simple' | 'normal' | 'detailed'
 
+/**
+ * A block the user cannot move: a work shift, a class, a training slot, an
+ * appointment. Anything immovable that the scheduler has to plan around.
+ */
 export type BlockType =
-  | 'school'
+  | 'fixed'
   | 'task'
-  | 'study'
+  | 'focus'
   | 'habit'
   | 'break'
-  | 'commitment'
+  | 'appointment'
   | 'free'
   | 'sleep'
 
-export type EventType = 'school' | 'commitment' | 'appointment' | 'exam' | 'other'
+/** `fixed` is recurring/structured, `milestone` is a one-off hard deadline. */
+export type EventType = 'fixed' | 'appointment' | 'milestone' | 'other'
+
 export type HabitFrequency = 'daily' | 'weekly'
 export type GoalStatus = 'active' | 'achieved' | 'abandoned'
 export type NotificationType =
@@ -26,12 +34,15 @@ export type NotificationType =
 export interface Profile {
   id: string
   full_name: string
-  school_year: string | null
   created_at: string
   updated_at: string
 }
 
-export interface Subject {
+/**
+ * A colour-coded label for organising tasks: "Work", "Health", "Side project",
+ * "Home", "Learning" — whatever fits the way that person actually lives.
+ */
+export interface Category {
   id: string
   user_id: string
   name: string
@@ -39,10 +50,14 @@ export interface Subject {
   created_at: string
 }
 
+export interface CategoryWithCount extends Category {
+  task_count: number
+}
+
 export interface Task {
   id: string
   user_id: string
-  subject_id: string | null
+  category_id: string | null
   title: string
   description: string | null
   priority: Priority
@@ -59,10 +74,6 @@ export interface Task {
   parent_task_id: string | null
   created_at: string
   updated_at: string
-}
-
-export interface SubjectWithCount extends Subject {
-  task_count: number
 }
 
 export interface TaskSession {
@@ -170,26 +181,43 @@ export interface AppNotification {
   body: string
   data: Record<string, unknown> | null
   read: boolean
+  key: string | null
+  deadline_at: string | null
   created_at: string
 }
 
-export interface AiConversation {
-  id: string
-  user_id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  created_at: string
+export type DeadlineReminderKind = 'task' | 'habit' | 'block' | 'event'
+export type DeadlineUrgency = 'overdue' | 'due-today' | 'due-tomorrow' | 'upcoming'
+
+/**
+ * Assistant, voice and privacy preferences.
+ *
+ * The defaults are the private ones: the microphone is not held open, screens
+ * are never watched, and conversations are not kept unless asked for.
+ */
+export interface AssistantPrefs {
+  enabled: boolean
+  speak_replies: boolean
+  wake_word: boolean
+  wake_phrase: string
+  screen_awareness: boolean
+  keep_conversations: boolean
+  conversation_days: number
+  /** Let the model call tools directly instead of only proposing changes. */
+  tools_enabled: boolean
+  /** Preferred free model id, or null to let the server choose. */
+  model: string | null
+  planning_style: PlanningStyleId
+  planning_detail: PlanningDetail
 }
 
-export interface AiAction {
+export interface DeadlineReminder {
   id: string
-  user_id: string
-  action_type: string
-  payload: Record<string, unknown>
-  status: 'proposed' | 'accepted' | 'rejected'
-  applied: boolean
-  explanation: string | null
-  created_at: string
+  title: string
+  kind: DeadlineReminderKind
+  due_at: string
+  urgency: DeadlineUrgency
+  color: string
 }
 
 export interface Settings {
@@ -197,8 +225,9 @@ export interface Settings {
   sleep_target_hours: number
   break_every_minutes: number
   break_minutes: number
-  preferred_study_start: string
-  preferred_study_end: string
+  /** The hours the user actually wants to plan demanding work in. */
+  focus_start: string
+  focus_end: string
   max_session_minutes: number
   wake_time: string
   bed_time: string
@@ -213,25 +242,17 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system'
   onboarded: boolean
   onboarding_completed_at: string | null
+  assistant_prefs: AssistantPrefs
   updated_at: string
-}
-
-export interface SchoolPeriod {
-  weekday: number
-  start: string
-  end: string
-  title: string | null
 }
 
 export interface OnboardingData {
   full_name: string
-  school_year: string
-  subjects: Array<{ name: string; color: string }>
-  schoolPeriods: SchoolPeriod[]
+  categories: Array<{ name: string; color: string }>
   availableStart: string
   availableEnd: string
-  preferredStart: string
-  preferredEnd: string
+  focusStart: string
+  focusEnd: string
   sleepTarget: number
   maxSessionMinutes: number
   commitments: Array<{

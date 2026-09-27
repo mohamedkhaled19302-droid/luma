@@ -30,7 +30,7 @@ export async function upsertCheckin(
 ): Promise<WellbeingCheckin> {
   const { data, error } = await supabase
     .from('wellbeing_checkins')
-    .upsert({ user_id: userId, ...input })
+    .upsert({ user_id: userId, ...input }, { onConflict: 'user_id,checkin_date' })
     .select(CHECKIN_COLUMNS)
     .single()
   if (error) throw error
