@@ -292,14 +292,14 @@ export default function OnboardingPage() {
                         id="energy"
                         type="range"
                         min={1}
-                        max={5}
+                        max={10}
                         step={1}
                         className="h-2 flex-1 accent-primary"
-                        value={state.energy ?? 3}
+                        value={state.energy ?? 5}
                         onChange={(event) => setField('energy', Number(event.target.value))}
                       />
-                      <span className="w-10 text-right text-sm font-medium text-muted-foreground">
-                        {state.energy ?? 3}/5
+                      <span className="w-12 text-right text-sm font-medium text-muted-foreground">
+                        {state.energy ?? 5}/10
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
