@@ -260,6 +260,21 @@ describe('POST /api/ai/chat', () => {
     expect(secondModels).toEqual([FREE_ROUTER_MODEL])
   })
 
+  it('lets another model answer when one rejects the request with a 400', async () => {
+    // Free models disagree about tools and long system prompts, and OpenRouter
+    // reports a provider blip as 400 too. One refusal is not the whole request.
+    const { fetchImpl } = fakeOpenRouter((attempt) =>
+      attempt === 1
+        ? { status: 400, payload: { error: { message: 'Provider returned error' } } }
+        : { status: 200, payload: replyPayload('Another model answered.', 'demo/helper:free') },
+    )
+    const result = await handleChat(userTurn, readServerConfig(ENV), deps(fetchImpl))
+    expect(result.status).toBe(200)
+    const body = result.body as AiChatResponse
+    expect(body.reply).toBe('Another model answered.')
+    expect(body.model).toBe('demo/helper:free')
+  })
+
   it('remembers a model that answers with no text and stops nominating it', async () => {
     // Reasoning-only and classifier models answer 200 with null content, so the
     // chain recovers — but nominating them again burns another attempt.

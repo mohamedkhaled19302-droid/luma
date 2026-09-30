@@ -109,6 +109,7 @@ export function mapUpstreamStatus(status: number, upstreamMessage: string): AiPr
   if (status === 404) {
     return new AiProxyError('model_unavailable', `That model is not available. ${detail}`.trim(), {
       retryable: true,
+      modelBlocked: true,
     })
   }
   if (status === 400 || status === 422) {

@@ -527,6 +527,15 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
         attempts -= 1
         continue
       }
+      // A 400 is usually one model declining the request shape rather than the
+      // user doing something wrong — free models disagree about tools, system
+      // prompts and long context, and OpenRouter also reports a provider blip
+      // as 400. The model is not blocked (that failure is transient) but another
+      // one gets a turn. If every model refuses, the 400 is surfaced as-is.
+      if (proxyError.code === 'bad_request') {
+        skippedReason = 'busy'
+        continue
+      }
       // Only retryable problems (busy model, withheld model, empty reply,
       // timeout) are worth another free model; a bad request or a rejected key
       // fails everywhere.
