@@ -78,10 +78,12 @@ export function mapUpstreamStatus(status: number, upstreamMessage: string): AiPr
     return new AiProxyError('invalid_key', 'The OpenRouter API key was rejected.', { status: 502 })
   }
   if (status === 403) {
-    // A 403 is about the model, not the key. Free models can be restricted to
+    // A 403 is about the model, not the key. Free models can be reserved for
     // agentic harnesses, or withheld from this account, and either way the next
-    // candidate may well work — so this must not abort the whole chain.
-    return new AiProxyError('model_unavailable', `That model is not available here. ${detail}`.trim(), {
+    // candidate may well work — so this must not abort the whole chain. The
+    // upstream wording ("only available on agentic harnesses…") is an OpenRouter
+    // implementation detail, so it is not shown to the user.
+    return new AiProxyError('model_unavailable', 'No free model is available to this app right now.', {
       status: 502,
       retryable: true,
       modelBlocked: true,
