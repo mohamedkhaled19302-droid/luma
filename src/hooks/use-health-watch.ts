@@ -9,6 +9,7 @@ import {
 } from '@/lib/health-bluetooth'
 import { isPlausible } from '@/lib/health-metrics'
 import {
+  disconnectDevice,
   insertSamples,
   markConnectionStatus,
   upsertConnection,
@@ -238,7 +239,6 @@ export function useHealthWatch({ userId, onSaved }: UseHealthWatchOptions) {
 
 async function disconnectDeviceSafe(userId: string, deviceName: string): Promise<void> {
   try {
-    const { disconnectDevice } = await import('@/services/health-service')
     await disconnectDevice(userId, deviceName)
   } catch {
     /* the row is only a record; failing to update it must not break the UI */

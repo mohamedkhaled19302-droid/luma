@@ -134,6 +134,21 @@ const TABLE_DEFAULTS: Record<string, () => Row> = {
     created_at: nowIso(),
     updated_at: nowIso(),
   }),
+  health_connections: () => ({
+    id: newId(),
+    source: 'bluetooth',
+    device_name: '',
+    status: 'disconnected',
+    connected_at: nowIso(),
+    meta: {},
+    created_at: nowIso(),
+  }),
+  health_samples: () => ({
+    id: newId(),
+    unit: '',
+    received_at: nowIso(),
+    created_at: nowIso(),
+  }),
 }
 
 /**
@@ -160,6 +175,8 @@ const NULLABLE_COLUMNS: Record<string, string[]> = {
   notifications: ['data', 'key', 'deadline_at'],
   settings: ['onboarding_completed_at'],
   templates: ['description'],
+  health_connections: ['device_handle', 'last_sample_at'],
+  health_samples: ['device_name', 'session_id', 'note'],
 }
 
 /** Tables carrying an `updated_at` maintained by a Postgres `moddatetime` trigger. */

@@ -196,6 +196,36 @@ function sampleStore(): Store {
         updated_at: 'u',
       },
     ],
+    health_connections: [
+      {
+        id: 'conn-1',
+        user_id: user,
+        source: 'bluetooth',
+        device_name: 'H10',
+        device_handle: null,
+        status: 'disconnected',
+        connected_at: 'c',
+        last_sample_at: 'c',
+        meta: { transport: 'bluetooth' },
+        created_at: 'c',
+      },
+    ],
+    health_samples: [
+      {
+        id: 'sample-1',
+        user_id: user,
+        metric: 'heart_rate',
+        value: 128,
+        unit: 'bpm',
+        recorded_at: '2026-09-20T07:30:00.000Z',
+        received_at: '2026-09-20T07:30:00.000Z',
+        source: 'bluetooth',
+        device_name: 'H10',
+        session_id: null,
+        note: null,
+        created_at: 'c',
+      },
+    ],
   }
 }
 
@@ -215,6 +245,8 @@ function emptyData(): BundleData {
     settings: [],
     task_sessions: [],
     templates: [],
+    health_connections: [],
+    health_samples: [],
   }
 }
 
@@ -292,6 +324,50 @@ describe('importBundle', () => {
     expect(client.getTables().tasks ?? []).toEqual(store.tasks)
     expect(client.getTables().categories ?? []).toEqual(store.categories)
     expect(client.getTables().tasks?.[0]?.user_id).toBe(USER_ID)
+  })
+
+  it('restores wearable history, which is the one thing a user cannot re-record', async () => {
+    const store = sampleStore()
+    const client = makeFakeClient({})
+    const value = bundle({
+      health_samples: store.health_samples as Row[],
+      health_connections: store.health_connections as Row[],
+    })
+
+    const result = await importBundle(client as unknown as SupabaseClient, value)
+
+    expect(result.inserted).toBe(2)
+    expect(result.errors).toEqual([])
+    expect(client.getTables().health_samples).toEqual(store.health_samples)
+    expect(client.getTables().health_connections).toEqual(store.health_connections)
+  })
+
+  it('does not import another account\'s health readings', async () => {
+    const client = makeFakeClient({})
+    const otherUser = 'someone-else'
+    const value = bundle({
+      health_samples: [
+        {
+          id: 'sample-x',
+          user_id: otherUser,
+          metric: 'heart_rate',
+          value: 200,
+          unit: 'bpm',
+          recorded_at: '2026-09-20T07:30:00.000Z',
+          received_at: '2026-09-20T07:30:00.000Z',
+          source: 'bluetooth',
+          device_name: null,
+          session_id: null,
+          note: null,
+          created_at: 'c',
+        },
+      ],
+    })
+
+    const result = await importBundle(client as unknown as SupabaseClient, value)
+
+    expect(result.inserted).toBe(0)
+    expect(client.getTables().health_samples ?? []).toEqual([])
   })
 
   it('rejects a wrong version', async () => {

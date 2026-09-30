@@ -261,6 +261,86 @@ describe('upsert', () => {
   })
 })
 
+describe('wearable tables', () => {
+  function makeSample(overrides: Row = {}): Row {
+    return {
+      user_id: USER,
+      metric: 'heart_rate',
+      value: 128,
+      recorded_at: '2026-09-20T07:30:00.000Z',
+      source: 'bluetooth',
+      ...overrides,
+    }
+  }
+
+  // Regression: the health tables were missing from the Dexie schema, so every
+  // read resolved to "Local data layer has no table" and the health page showed
+  // an error instead of the user's readings.
+  it('resolves the health tables instead of reporting them missing', async () => {
+    const { data, error } = await localData.from('health_samples').select()
+    expect(error).toBeNull()
+    expect(data).toEqual([])
+
+    const connections = await localData.from('health_connections').select()
+    expect(connections.error).toBeNull()
+  })
+
+  it('stamps id, unit and received_at on a partial sample insert', async () => {
+    const { data, error } = await localData.from('health_samples').insert(makeSample()).select()
+    expect(error).toBeNull()
+    const row = (data as Row[])[0]!
+    expect(typeof row['id']).toBe('string')
+    // received_at is when the app took the reading, not when it was worn, so it
+    // defaults to now rather than mirroring recorded_at.
+    expect(Number.isNaN(Date.parse(String(row['received_at'])))).toBe(false)
+    expect(String(row['received_at'])).not.toBe(row['recorded_at'])
+    expect(row['session_id']).toBeNull()
+    expect(row['note']).toBeNull()
+  })
+
+  it('keeps one account\'s readings invisible to the other', async () => {
+    await localData.from('health_samples').insert(makeSample({ value: 90 }))
+    await localData.from('health_samples').insert(makeSample({ user_id: OTHER, value: 190 }))
+
+    const mine = await localData.from('health_samples').select().eq('user_id', USER)
+    const theirs = await localData.from('health_samples').select().eq('user_id', OTHER)
+    expect(mine.data).toHaveLength(1)
+    expect((mine.data as Row[])[0]?.['value']).toBe(90)
+    expect(theirs.data).toHaveLength(1)
+    expect((theirs.data as Row[])[0]?.['value']).toBe(190)
+  })
+
+  it('reads a time window the way the health page asks for it', async () => {
+    await localData.from('health_samples').insert(makeSample({ recorded_at: '2026-09-19T07:00:00.000Z' }))
+    await localData
+      .from('health_samples')
+      .insert(makeSample({ recorded_at: '2026-09-20T07:00:00.000Z' }))
+    await localData.from('health_samples').insert(makeSample({ recorded_at: '2026-09-18T07:00:00.000Z' }))
+
+    const window = await localData
+      .from('health_samples')
+      .select()
+      .eq('user_id', USER)
+      .gte('recorded_at', '2026-09-19T00:00:00.000Z')
+      .order('recorded_at', { ascending: true })
+
+    expect(window.error).toBeNull()
+    expect(window.data).toHaveLength(2)
+  })
+
+  it('reconnects to the same strap rather than logging it twice', async () => {
+    const row = { user_id: USER, source: 'bluetooth', device_name: 'H10', status: 'connected' }
+    await localData.from('health_connections').upsert(row, { onConflict: 'user_id,device_name' })
+    await localData
+      .from('health_connections')
+      .upsert({ ...row, status: 'disconnected' }, { onConflict: 'user_id,device_name' })
+
+    const { data } = await localData.from('health_connections').select()
+    expect(data).toHaveLength(1)
+    expect((data as Row[])[0]?.['status']).toBe('disconnected')
+  })
+})
+
 describe('account isolation on a shared device', () => {
   it('keeps two accounts on one device separate', async () => {
     await seedTasks(1, USER)

@@ -7,6 +7,8 @@ import type {
   Goal,
   Habit,
   HabitLog,
+  HealthConnection,
+  HealthSample,
   Profile,
   ScheduleBlock,
   Settings,
@@ -55,8 +57,10 @@ export const CONFLICT_KEYS: Record<string, string[]> = {
   daily_plans: ['user_id', 'plan_date'],
   task_sessions: ['id'],
   schedule_blocks: ['id'],
-  wellbeing_checkins: ['user_id', 'checkin_date'],
+      wellbeing_checkins: ['user_id', 'checkin_date'],
   notifications: ['id'],
+  health_connections: ['user_id', 'device_name'],
+  health_samples: ['id'],
 }
 
 export class LumaDatabase extends Dexie {
@@ -74,6 +78,8 @@ export class LumaDatabase extends Dexie {
   schedule_blocks!: Table<ScheduleBlock, string>
   wellbeing_checkins!: Table<WellbeingCheckin, string>
   notifications!: Table<AppNotification, string>
+  health_connections!: Table<HealthConnection, string>
+  health_samples!: Table<HealthSample, string>
 
   constructor() {
     // Deliberately NOT named "luma". `src/storage/indexeddb.ts` already owns
@@ -99,6 +105,16 @@ export class LumaDatabase extends Dexie {
       schedule_blocks: 'id, user_id, plan_date, start_at, block_type, task_id, habit_id',
       wellbeing_checkins: 'id, user_id, checkin_date, [user_id+checkin_date]',
       notifications: 'id, user_id, read, key, created_at',
+    })
+    // Wearable data arrived after v1 shipped. A strap records continuously, so
+    // `recorded_at` is indexed for the windowed reads the health page makes, and
+    // `metric` keeps the per-metric aggregates cheap. The compound index matches
+    // the unique constraint in the migration, so reconnecting a known strap
+    // updates its row instead of adding a second one.
+    this.version(2).stores({
+      health_connections:
+        'id, user_id, device_name, status, last_sample_at, [user_id+device_name]',
+      health_samples: 'id, user_id, metric, recorded_at, session_id, [user_id+recorded_at]',
     })
   }
 }
@@ -148,6 +164,8 @@ export async function clearLocalData(): Promise<void> {
       localDb.schedule_blocks,
       localDb.wellbeing_checkins,
       localDb.notifications,
+      localDb.health_connections,
+      localDb.health_samples,
     ],
     async () => {
       // Sequential rather than Promise.all: Dexie transactions are safer when

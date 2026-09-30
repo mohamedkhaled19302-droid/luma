@@ -9,6 +9,8 @@ import type {
   Goal,
   Habit,
   HabitLog,
+  HealthConnection,
+  HealthSample,
   Profile,
   ScheduleBlock,
   Settings,
@@ -34,6 +36,8 @@ export interface BundleData {
   settings: Settings[]
   task_sessions: TaskSession[]
   templates: TemplateRow[]
+  health_connections: HealthConnection[]
+  health_samples: HealthSample[]
 }
 
 export interface ExportBundle {
@@ -182,6 +186,23 @@ const TABLE_DEFS: TableDef[] = [
     dataKey: 'notifications',
     table: 'notifications',
     columns: 'id, user_id, type, title, body, data, read, key, deadline_at, created_at',
+    userColumn: 'user_id',
+    keyColumns: ['id'],
+    onConflict: 'id',
+  },
+  {
+    dataKey: 'health_connections',
+    table: 'health_connections',
+    columns: 'id, user_id, source, device_name, device_handle, status, connected_at, last_sample_at, meta, created_at',
+    userColumn: 'user_id',
+    keyColumns: ['user_id', 'device_name'],
+    onConflict: 'user_id,device_name',
+  },
+  {
+    dataKey: 'health_samples',
+    table: 'health_samples',
+    columns:
+      'id, user_id, metric, value, unit, recorded_at, received_at, source, device_name, session_id, note, created_at',
     userColumn: 'user_id',
     keyColumns: ['id'],
     onConflict: 'id',
