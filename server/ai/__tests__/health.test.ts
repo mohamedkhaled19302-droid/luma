@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseHealthSummary, renderHealthContext } from '../health'
+import {
+  HEALTH_MAX_TOKENS,
+  parseHealthSummary,
+  renderHealthContext,
+  runHealthGuidance,
+} from '../health'
+import { resetModelMemory } from '../openrouter'
+import type { FetchLike } from '../models'
 
 /**
  * Server-side validation of the health summary.
@@ -117,5 +124,41 @@ describe('renderHealthContext', () => {
       parseHealthSummary({ heartRate: { average: 60, count: 10 }, sampleCount: 10 }),
     )
     expect(text).not.toContain('Time in zones')
+  })
+})
+
+describe('runHealthGuidance', () => {
+  it('keeps the answer short enough to finish inside the request deadline', async () => {
+    resetModelMemory()
+    // A free model that rambles to the 800-token default is what makes the
+    // button time out, so guidance is capped regardless of the server default.
+    const bodies: Array<Record<string, unknown>> = []
+    const fetchImpl = (async (_url: string, init?: { body?: string }) => {
+      bodies.push(JSON.parse(init?.body ?? '{}') as Record<string, unknown>)
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'demo/helper:free',
+          choices: [{ message: { role: 'assistant', content: 'Add an easy day.' } }],
+          usage: { prompt_tokens: 10, completion_tokens: 8 },
+        }),
+      }
+    }) as unknown as FetchLike
+
+    const result = await runHealthGuidance(
+      {
+        apiKey: 'sk-or-v1-test',
+        fetchImpl,
+        modelCandidates: ['demo/helper:free'],
+        summary: parseHealthSummary({ heartRate: { average: 62, count: 10 }, sampleCount: 10 }),
+        question: 'How am I doing?',
+        temperature: 0.4,
+        maxTokens: 800,
+      },
+    )
+
+    expect(result.reply).toBe('Add an easy day.')
+    expect(bodies[0]?.['max_tokens']).toBe(HEALTH_MAX_TOKENS)
   })
 })

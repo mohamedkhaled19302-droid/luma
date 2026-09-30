@@ -6,7 +6,7 @@ import type {
 } from '../../src/lib/ai/types.js'
 import { BRAND } from '../../src/lib/brand.js'
 import { AiProxyError, mapUpstreamStatus, toAiProxyError } from './errors.js'
-import type { FetchLike } from './models.js'
+import { MAX_MODEL_CANDIDATES, type FetchLike } from './models.js'
 import { parseAssistantReply, proposalFromToolCall } from './proposals.js'
 import { buildContextBlock, buildSystemPrompt } from './prompt.js'
 import {
@@ -33,6 +33,13 @@ export const REQUEST_TIMEOUT_MS = 45_000
  * limit, so we would be killed mid-call instead of returning a clean error.
  */
 export const TOTAL_REQUEST_BUDGET_MS = 40_000
+/**
+ * Ceiling for a single candidate. The free tier mixes 2B models that answer in
+ * a couple of seconds with 550B models that can sit on a provider queue for
+ * half a minute. Waiting out one slow model burns the whole budget, so we give
+ * it a fair slice and then move to the next candidate instead.
+ */
+export const PER_MODEL_TIMEOUT_MS = 15_000
 
 /**
  * Some free models answer 403 for everyone but the agentic harnesses they are
@@ -44,25 +51,39 @@ export const TOTAL_REQUEST_BUDGET_MS = 40_000
  */
 const BLOCKED_MODEL_TTL_MS = 10 * 60_000
 const blockedModels = new Map<string, number>()
-let lastGoodModel: string | null = null
+/** Last observed round-trip time per model, so we stop re-picking the slow one. */
+const modelLatencyMs = new Map<string, number>()
 
-/** Drop expired entries and put the most likely-to-succeed model at the front. */
+/**
+ * Order candidates by what this instance has learned: models that answered
+ * quickly first, then untried ones, then models that were slow last time, with
+ * the withheld ones last. Purely a preference — nothing is dropped, and an
+ * instance that has learned nothing still tries everything in catalogue order.
+ */
 function orderCandidates(candidates: readonly string[]): string[] {
   const now = Date.now()
   for (const [id, until] of blockedModels) {
     if (until <= now) blockedModels.delete(id)
   }
+  const rank = (model: string): number => {
+    const seen = modelLatencyMs.get(model)
+    if (seen === undefined) return 1
+    return seen <= PER_MODEL_TIMEOUT_MS / 2 ? 0 : 2
+  }
   const live = candidates.filter((model) => !blockedModels.has(model))
   const blocked = candidates.filter((model) => blockedModels.has(model))
-  const preferred = lastGoodModel && live.includes(lastGoodModel) ? [lastGoodModel] : []
-  const rest = live.filter((model) => !preferred.includes(model))
-  return [...preferred, ...rest, ...blocked]
+  return [
+    ...live.filter((model) => rank(model) === 0).sort((a, b) => modelLatencyMs.get(a)! - modelLatencyMs.get(b)!),
+    ...live.filter((model) => rank(model) === 1),
+    ...live.filter((model) => rank(model) === 2),
+    ...blocked,
+  ]
 }
 
 /** Test seam: forget what this instance learned about the free pool. */
 export function resetModelMemory(): void {
   blockedModels.clear()
-  lastGoodModel = null
+  modelLatencyMs.clear()
 }
 
 export interface ChatMessageIn {
@@ -372,8 +393,12 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
   const budgetTimer = setTimeout(() => budget.abort(), TOTAL_REQUEST_BUDGET_MS)
 
   try {
-    for (const model of orderCandidates(input.modelCandidates)) {
+    // Reorder first, then take the budget: a model this instance already knows
+    // is withheld must not consume one of the few real attempts.
+    const candidates = orderCandidates(input.modelCandidates).slice(0, MAX_MODEL_CANDIDATES)
+    for (const model of candidates) {
       attempts += 1
+      const attemptStarted = Date.now()
       try {
         const completion = await requestCompletion({
           apiKey: input.apiKey,
@@ -384,9 +409,13 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
           temperature: input.temperature,
           maxTokens: input.maxTokens,
           ...(toolsUsable && toolPayload ? { tools: toolPayload } : {}),
-          timeoutMs: Math.max(5_000, deadline - Date.now()),
+          timeoutMs: Math.min(
+            PER_MODEL_TIMEOUT_MS,
+            Math.max(5_000, deadline - Date.now()),
+          ),
           externalSignal: budget.signal,
         })
+        modelLatencyMs.set(model, Date.now() - attemptStarted)
 
         const parsed = parseAssistantReply(completion.content, `p${Date.now().toString(36)}`)
 
@@ -468,8 +497,6 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
           ? 'Here is what I suggest.'
           : 'I could not produce a reply just now. Please try again.')
 
-      lastGoodModel = model
-
       return {
         reply,
         model: completion.model,
@@ -485,7 +512,6 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
       lastError = proxyError
       if (proxyError.modelBlocked) {
         blockedModels.set(model, Date.now() + BLOCKED_MODEL_TTL_MS)
-        if (lastGoodModel === model) lastGoodModel = null
         skippedReason = 'withheld'
       } else if (proxyError.retryable) {
         skippedReason = 'busy'

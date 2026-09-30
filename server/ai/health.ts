@@ -142,6 +142,9 @@ export interface HealthGuidanceInput {
   signal?: AbortSignal
 }
 
+/** Guidance is a few concrete suggestions, not an essay. */
+export const HEALTH_MAX_TOKENS = 450
+
 /**
  * Ask a verified-free model for guidance on the person's own readings.
  *
@@ -172,7 +175,10 @@ export async function runHealthGuidance(
     systemPrompt: HEALTH_SYSTEM_PROMPT,
     toolsEnabled: input.toolsEnabled === true,
     temperature: input.temperature,
-    maxTokens: input.maxTokens,
+    // A short, concrete plan is the whole point of this answer. Letting a free
+    // model ramble to the 800-token default is what pushes it past the request
+    // deadline, so guidance is capped and the model has to be concise.
+    maxTokens: Math.min(input.maxTokens, HEALTH_MAX_TOKENS),
     signal: input.signal,
   })
 }
