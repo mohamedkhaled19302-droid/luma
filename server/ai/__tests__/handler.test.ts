@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { handleChat, handleModels, readServerConfig } from '../handler'
 import { FREE_ROUTER_MODEL, resetFreeModelCache, type FetchLike } from '../models'
+import { resetModelMemory } from '../openrouter'
 import { SCOPE_REPLY } from '../prompt'
 import type { AiChatResponse, AiErrorResponse, AiModelsResponse } from '../../../src/lib/ai/types'
 
@@ -64,6 +65,7 @@ const userTurn = {
 
 beforeEach(() => {
   resetFreeModelCache()
+  resetModelMemory()
 })
 
 describe('readServerConfig', () => {
@@ -230,6 +232,32 @@ describe('POST /api/ai/chat', () => {
     const body = result.body as AiErrorResponse
     expect(body.error.code).toBe('model_unavailable')
     expect(body.error.code).not.toBe('invalid_key')
+  })
+
+  it('stops re-trying a withheld model and reuses the one that answered', async () => {
+    // First call: the concrete model is withheld, the router answers.
+    const first = fakeOpenRouter((attempt) =>
+      attempt === 1
+        ? { status: 403, payload: { error: { message: 'only available on agentic harnesses' } } }
+        : { status: 200, payload: replyPayload('First answer.', FREE_ROUTER_MODEL) },
+    )
+    await handleChat(userTurn, readServerConfig(ENV), deps(first.fetchImpl))
+    const firstModels = first.calls
+      .filter((call) => call.url.endsWith('/chat/completions'))
+      .map((call) => String(call.body?.['model']))
+    expect(firstModels).toEqual(['demo/helper:free', FREE_ROUTER_MODEL])
+
+    // Second call: the withheld model is skipped and the router is asked first.
+    const second = fakeOpenRouter(() => ({
+      status: 200,
+      payload: replyPayload('Second answer.', FREE_ROUTER_MODEL),
+    }))
+    const result = await handleChat(userTurn, readServerConfig(ENV), deps(second.fetchImpl))
+    expect(result.status).toBe(200)
+    const secondModels = second.calls
+      .filter((call) => call.url.endsWith('/chat/completions'))
+      .map((call) => String(call.body?.['model']))
+    expect(secondModels).toEqual([FREE_ROUTER_MODEL])
   })
 })
 

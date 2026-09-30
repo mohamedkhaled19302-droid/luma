@@ -27,6 +27,43 @@ export const OPENROUTER_DEFAULT_BASE = 'https://openrouter.ai/api/v1'
 export const DEFAULT_MAX_TOKENS = 800
 export const DEFAULT_TEMPERATURE = 0.4
 export const REQUEST_TIMEOUT_MS = 45_000
+/**
+ * Ceiling for one whole request, across every candidate we try. The free pool
+ * is slow enough that three sequential 45s attempts would outlive the platform
+ * limit, so we would be killed mid-call instead of returning a clean error.
+ */
+export const TOTAL_REQUEST_BUDGET_MS = 40_000
+
+/**
+ * Some free models answer 403 for everyone but the agentic harnesses they are
+ * reserved for. That verdict is stable for a while, and with only a handful of
+ * candidate slots it is expensive to rediscover on every request, so each
+ * instance remembers what it learned and tries the model that last worked
+ * first. Both are per-instance and time limited: a cold function still
+ * discovers the pool, and a restarted one is never wrong for long.
+ */
+const BLOCKED_MODEL_TTL_MS = 10 * 60_000
+const blockedModels = new Map<string, number>()
+let lastGoodModel: string | null = null
+
+/** Drop expired entries and put the most likely-to-succeed model at the front. */
+function orderCandidates(candidates: readonly string[]): string[] {
+  const now = Date.now()
+  for (const [id, until] of blockedModels) {
+    if (until <= now) blockedModels.delete(id)
+  }
+  const live = candidates.filter((model) => !blockedModels.has(model))
+  const blocked = candidates.filter((model) => blockedModels.has(model))
+  const preferred = lastGoodModel && live.includes(lastGoodModel) ? [lastGoodModel] : []
+  const rest = live.filter((model) => !preferred.includes(model))
+  return [...preferred, ...rest, ...blocked]
+}
+
+/** Test seam: forget what this instance learned about the free pool. */
+export function resetModelMemory(): void {
+  blockedModels.clear()
+  lastGoodModel = null
+}
 
 export interface ChatMessageIn {
   role: 'system' | 'user' | 'assistant'
@@ -320,31 +357,46 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
   // stop sending it and rely on the JSON-fence fallback instead.
   let toolsUsable = wantsTools
   let droppedToolSupport = false
+  /** Why the previous candidate was passed over, for the notice line. */
+  let skippedReason: 'busy' | 'withheld' | null = null
 
-  for (const model of input.modelCandidates) {
-    attempts += 1
-    try {
-      const completion = await requestCompletion({
-        apiKey: input.apiKey,
-        fetchImpl: input.fetchImpl,
-        baseUrl: input.baseUrl,
-        model,
-        messages: [...systemMessages, ...history],
-        temperature: input.temperature,
-        maxTokens: input.maxTokens,
-        ...(toolsUsable && toolPayload ? { tools: toolPayload } : {}),
-        externalSignal: input.signal,
-      })
+  // One deadline for the whole chain, not one per candidate, so a slow free
+  // pool costs us a clean timeout rather than a dead function.
+  const deadline = Date.now() + TOTAL_REQUEST_BUDGET_MS
+  const budget = new AbortController()
+  const onCallerAbort = () => budget.abort()
+  if (input.signal) {
+    if (input.signal.aborted) budget.abort()
+    else input.signal.addEventListener('abort', onCallerAbort, { once: true })
+  }
+  const budgetTimer = setTimeout(() => budget.abort(), TOTAL_REQUEST_BUDGET_MS)
 
-      const parsed = parseAssistantReply(completion.content, `p${Date.now().toString(36)}`)
+  try {
+    for (const model of orderCandidates(input.modelCandidates)) {
+      attempts += 1
+      try {
+        const completion = await requestCompletion({
+          apiKey: input.apiKey,
+          fetchImpl: input.fetchImpl,
+          baseUrl: input.baseUrl,
+          model,
+          messages: [...systemMessages, ...history],
+          temperature: input.temperature,
+          maxTokens: input.maxTokens,
+          ...(toolsUsable && toolPayload ? { tools: toolPayload } : {}),
+          timeoutMs: Math.max(5_000, deadline - Date.now()),
+          externalSignal: budget.signal,
+        })
 
-      // Native tool calls take precedence over the JSON fence. Destructive ones
-      // are held for explicit approval rather than turned into a button.
-      const proposals: AiProposal[] = []
-      let confirmation: AiConfirmationRequest | undefined
-      const toolPrefix = `t${Date.now().toString(36)}`
-      for (const call of completion.toolCalls) {
-        const validation = validateToolCall(call.name, call.arguments)
+        const parsed = parseAssistantReply(completion.content, `p${Date.now().toString(36)}`)
+
+        // Native tool calls take precedence over the JSON fence. Destructive ones
+        // are held for explicit approval rather than turned into a button.
+        const proposals: AiProposal[] = []
+        let confirmation: AiConfirmationRequest | undefined
+        const toolPrefix = `t${Date.now().toString(36)}`
+        for (const call of completion.toolCalls) {
+          const validation = validateToolCall(call.name, call.arguments)
         if (!validation.ok) continue
         if (validation.destructive) {
           // Hold only the first destructive action; queueing several
@@ -400,7 +452,11 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
         notices.push(`${input.rejectedRequest} is no longer a free model, so I used a free one.`)
       }
       if (attempts > 1) {
-        notices.push('The first free model was busy, so I used another one.')
+        notices.push(
+          skippedReason === 'withheld'
+            ? 'One free model was not available to this app, so I used another one.'
+            : 'The first free model was busy, so I used another one.',
+        )
       }
       if (droppedToolSupport) {
         notices.push('This model cannot call tools directly, so I proposed the change for your approval instead.')
@@ -411,6 +467,8 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
         (proposals.length > 0 || confirmation
           ? 'Here is what I suggest.'
           : 'I could not produce a reply just now. Please try again.')
+
+      lastGoodModel = model
 
       return {
         reply,
@@ -425,6 +483,13 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
     } catch (error) {
       const proxyError = toAiProxyError(error)
       lastError = proxyError
+      if (proxyError.modelBlocked) {
+        blockedModels.set(model, Date.now() + BLOCKED_MODEL_TTL_MS)
+        if (lastGoodModel === model) lastGoodModel = null
+        skippedReason = 'withheld'
+      } else if (proxyError.retryable) {
+        skippedReason = 'busy'
+      }
       // A free model that refuses the `tools` payload is retried immediately in
       // advisory mode rather than being abandoned.
       if (toolsUsable && !proxyError.retryable && proxyError.code === 'bad_request') {
@@ -433,10 +498,15 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
         attempts -= 1
         continue
       }
-      // Only retryable problems (busy model, empty reply, timeout) are worth
-      // another free model; a bad request or a rejected key fails everywhere.
+      // Only retryable problems (busy model, withheld model, empty reply,
+      // timeout) are worth another free model; a bad request or a rejected key
+      // fails everywhere.
       if (!proxyError.retryable) break
     }
+    }
+  } finally {
+    clearTimeout(budgetTimer)
+    if (input.signal) input.signal.removeEventListener('abort', onCallerAbort)
   }
 
   throw lastError ?? new AiProxyError('no_free_model', 'No free model could answer this request.')

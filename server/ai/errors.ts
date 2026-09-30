@@ -13,17 +13,23 @@ export class AiProxyError extends Error {
   readonly code: AiErrorCode
   readonly status: number
   readonly retryable: boolean
+  /**
+   * Set when this specific model is withheld from us but the key is fine, so
+   * the caller can stop nominating it on later requests.
+   */
+  readonly modelBlocked: boolean
 
   constructor(
     code: AiErrorCode,
     message: string,
-    options: { status?: number; retryable?: boolean } = {},
+    options: { status?: number; retryable?: boolean; modelBlocked?: boolean } = {},
   ) {
     super(message)
     this.name = 'AiProxyError'
     this.code = code
     this.status = options.status ?? statusForCode(code)
     this.retryable = options.retryable ?? isRetryable(code)
+    this.modelBlocked = options.modelBlocked ?? false
   }
 }
 
@@ -78,6 +84,7 @@ export function mapUpstreamStatus(status: number, upstreamMessage: string): AiPr
     return new AiProxyError('model_unavailable', `That model is not available here. ${detail}`.trim(), {
       status: 502,
       retryable: true,
+      modelBlocked: true,
     })
   }
   if (status === 402) {
