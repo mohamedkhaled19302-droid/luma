@@ -18,15 +18,13 @@ export const FREE_ROUTER_MODEL = 'openrouter/free'
 export const FREE_LIST_TTL_MS = 10 * 60 * 1000
 /** Max automatic fallbacks per request (keeps latency and request count sane). */
 /**
- * How many free models one request may try. The cost of a candidate is not
- * uniform: a model that is withheld, silent, or rate limited fails in about a
- * second, while one that is actually thinking uses most of the request budget.
- * So the count is generous and the *time* is capped instead — see
- * `PER_MODEL_TIMEOUT_MS` and `TOTAL_REQUEST_BUDGET_MS` in the transport. Three
- * was not enough: the free catalogue leads with models that fail instantly, and
- * three slots meant two of them could leave no real attempt at all.
+ * How many free models one request may try. Deliberately small: the free pool
+ * is shared and rate limited, so every extra candidate is another upstream
+ * request that makes the contention worse for everyone, including us. Fast
+ * failures are what we spend the extra attempts on, and the time budget in the
+ * transport is what actually bounds a request.
  */
-export const MAX_MODEL_CANDIDATES = 6
+export const MAX_MODEL_CANDIDATES = 4
 
 /** The tiny slice of `fetch` we depend on — keeps this module easy to test. */
 export interface MinimalResponse {

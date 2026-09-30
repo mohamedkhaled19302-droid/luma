@@ -32,14 +32,14 @@ export const REQUEST_TIMEOUT_MS = 45_000
  * is slow enough that three sequential 45s attempts would outlive the platform
  * limit, so we would be killed mid-call instead of returning a clean error.
  */
-export const TOTAL_REQUEST_BUDGET_MS = 40_000
+export const TOTAL_REQUEST_BUDGET_MS = 30_000
 /**
- * Ceiling for a single candidate. The free tier mixes 2B models that answer in
- * a couple of seconds with 550B models that can sit on a provider queue for
+ * Ceiling for a single candidate. The free tier mixes small models that answer
+ * in a couple of seconds with large ones that can sit on a provider queue for
  * half a minute. Waiting out one slow model burns the whole budget, so we give
  * it a fair slice and then move to the next candidate instead.
  */
-export const PER_MODEL_TIMEOUT_MS = 15_000
+export const PER_MODEL_TIMEOUT_MS = 12_000
 
 /**
  * Some free models answer 403 for everyone but the agentic harnesses they are
@@ -223,7 +223,7 @@ export async function requestCompletion(input: CompletionInput): Promise<Complet
       // Reasoning-only or empty replies are retried on another free model, and
       // this model is not nominated again: producing no text at all is a
       // property of the model, not bad luck.
-      throw new AiProxyError('model_unavailable', 'That model returned an empty reply.', {
+      throw new AiProxyError('model_unavailable', 'That model did not return an answer. Please try again.', {
         retryable: true,
         modelBlocked: true,
       })
@@ -525,15 +525,6 @@ export async function runPlanningChat(input: PlanningChatInput): Promise<AiChatR
         toolsUsable = false
         droppedToolSupport = true
         attempts -= 1
-        continue
-      }
-      // A 400 is usually one model declining the request shape rather than the
-      // user doing something wrong — free models disagree about tools, system
-      // prompts and long context, and OpenRouter also reports a provider blip
-      // as 400. The model is not blocked (that failure is transient) but another
-      // one gets a turn. If every model refuses, the 400 is surfaced as-is.
-      if (proxyError.code === 'bad_request') {
-        skippedReason = 'busy'
         continue
       }
       // Only retryable problems (busy model, withheld model, empty reply,
