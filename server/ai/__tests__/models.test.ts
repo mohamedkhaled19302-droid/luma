@@ -191,8 +191,17 @@ describe('resolveModelCandidates', () => {
 
   it('always allows the free router and keeps a bounded chain', () => {
     const result = resolveModelCandidates(undefined, list)
-    expect(result.candidates).toEqual([FREE_ROUTER_MODEL, 'plain:free'])
+    expect(result.candidates).toEqual(['plain:free', FREE_ROUTER_MODEL])
     expect(result.candidates.length).toBeLessThanOrEqual(3)
+  })
+
+  it('tries a named conversational model before the router', () => {
+    // Regression: the router was tried first and once answered a health
+    // question with "User Safety: safe" from a content-safety classifier.
+    const result = resolveModelCandidates(undefined, list)
+    expect(result.candidates.indexOf('plain:free')).toBeLessThan(
+      result.candidates.indexOf(FREE_ROUTER_MODEL),
+    )
   })
 
   it('still offers the free router when verification is unavailable', () => {

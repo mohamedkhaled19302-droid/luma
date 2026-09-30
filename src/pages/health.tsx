@@ -278,7 +278,7 @@ export default function HealthPage() {
           <CardTitle className="text-base">Last {WINDOW_DAYS} days</CardTitle>
           <CardDescription>
             {overview.totalSamples > 0
-              ? `${overview.totalSamples} readings`
+              ? `${overview.totalSamples} ${overview.totalSamples === 1 ? 'reading' : 'readings'}`
               : 'Nothing recorded in this window yet.'}
           </CardDescription>
         </CardHeader>

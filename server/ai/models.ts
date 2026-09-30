@@ -211,6 +211,13 @@ export interface ModelResolution {
  * A requested model is honoured only if the live catalogue still reports it as
  * fully free; otherwise it is dropped (never silently paid) and the caller is
  * told, so the UI can explain the switch.
+ *
+ * Concrete models are tried before the free router. `openrouter/free` picks
+ * whatever free model is cheapest at that moment, and its pool includes
+ * classifiers and guard models: asked for training guidance it once answered
+ * "User Safety: safe" from `nemotron-3.5-content-safety`. Naming a model we have
+ * already verified as conversational keeps the reply on-topic, and the router
+ * stays last as a fallback for when every named model is rate limited.
  */
 export function resolveModelCandidates(
   requested: string | undefined,
@@ -227,11 +234,12 @@ export function resolveModelCandidates(
     else rejectedRequest = trimmed
   }
 
-  if (!ordered.includes(FREE_ROUTER_MODEL)) ordered.push(FREE_ROUTER_MODEL)
   for (const model of list.models) {
     if (ordered.length >= MAX_MODEL_CANDIDATES) break
+    if (model.isRouter) continue
     if (!ordered.includes(model.id)) ordered.push(model.id)
   }
+  if (!ordered.includes(FREE_ROUTER_MODEL)) ordered.push(FREE_ROUTER_MODEL)
 
   return { candidates: ordered.slice(0, MAX_MODEL_CANDIDATES), rejectedRequest, list }
 }

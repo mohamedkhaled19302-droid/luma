@@ -134,7 +134,12 @@ describe('POST /api/ai/chat', () => {
     )
     expect(result.status).toBe(200)
     const chatCall = calls.find((call) => call.url.endsWith('/chat/completions'))
-    expect(chatCall?.body?.['model']).toBe(FREE_ROUTER_MODEL)
+    const sentModel = String(chatCall?.body?.['model'])
+    // The point of the test is that a paid model is never sent. The free router
+    // is no longer tried first, so the upstream model is a verified free chat
+    // model rather than the router.
+    expect(sentModel).not.toBe('anthropic/claude-paid')
+    expect(sentModel).toBe('demo/helper:free')
 
     const body = result.body as AiChatResponse
     expect(body.reply).toBe('You have three things today.')
