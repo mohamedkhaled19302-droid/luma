@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite'
-import { chatEndpoint, modelsEndpoint } from './ai/endpoints.js'
+import { chatEndpoint, healthEndpoint, modelsEndpoint } from './ai/endpoints.js'
 import { visionEndpoint } from './ai/vision.js'
 import { sendJson, type ApiRequestLike, type ApiResponseLike } from './http.js'
 
@@ -83,6 +83,10 @@ export function aiDevApi(env: Record<string, string | undefined>): Plugin {
       server.middlewares.use(
         '/api/ai/vision',
         mount((req, res) => visionEndpoint(req, res, { env, requireAuth: false })),
+      )
+      server.middlewares.use(
+        '/api/ai/health',
+        mount((req, res) => healthEndpoint(req, res, { env, requireAuth: false })),
       )
     },
   }

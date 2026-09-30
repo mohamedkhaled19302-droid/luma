@@ -1,5 +1,6 @@
 import {
   handleChat,
+  handleHealth,
   handleModels,
   readServerConfig,
   type AiServerConfig,
@@ -104,4 +105,20 @@ export async function chatEndpoint(
   sendJson(res, result.status, result.body)
 }
 
-export { handleChat, handleModels, readServerConfig }
+/** POST /api/ai/health */
+export async function healthEndpoint(
+  req: ApiRequestLike,
+  res: ApiResponseLike,
+  options: EndpointOptions,
+): Promise<void> {
+  if (req.method && req.method !== 'POST') {
+    methodNotAllowed(res, ['POST'])
+    return
+  }
+  if (!(await authorise(req, res, 'chat', options))) return
+  const payload = await readJsonBody(req)
+  const result = await handleHealth(payload, config(options), deps(options))
+  sendJson(res, result.status, result.body)
+}
+
+export { handleChat, handleHealth, handleModels, readServerConfig }

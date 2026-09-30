@@ -2,6 +2,7 @@ import { supabase } from '@/database/client'
 import type {
   AiChatRequest,
   AiChatResponse,
+  AiHealthRequest,
   AiModelsResponse,
 } from './types'
 
@@ -71,6 +72,31 @@ export async function sendAiChat(
   signal?: AbortSignal,
 ): Promise<AiChatResponse> {
   const response = await fetch('/api/ai/chat', {
+    method: 'POST',
+    signal,
+    headers: {
+      ...(await authHeaders()),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) throw await readError(response)
+  return (await response.json()) as AiChatResponse
+}
+
+/**
+ * Asks the health guide about the caller's own readings.
+ *
+ * Deliberately a separate endpoint from chat: the health prompt has its own
+ * hard limits (no diagnosis, no medication advice) and its own server-side
+ * validation of the numbers, so health data can never leak into a general
+ * conversation where those rules would not apply.
+ */
+export async function sendHealthGuidance(
+  request: AiHealthRequest,
+  signal?: AbortSignal,
+): Promise<AiChatResponse> {
+  const response = await fetch('/api/ai/health', {
     method: 'POST',
     signal,
     headers: {

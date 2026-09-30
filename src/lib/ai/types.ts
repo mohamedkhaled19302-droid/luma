@@ -141,6 +141,34 @@ export interface AiChatRequest {
 }
 
 /**
+ * A compact, anonymised summary of the caller's own wearable readings.
+ *
+ * The browser computes this and the server validates it again before it is
+ * allowed near a model. Only these aggregates cross the network — never the raw
+ * reading stream, and never anything identifying.
+ */
+export interface AiHealthSummaryPayload {
+  windowDays: number
+  heartRate: { average: number | null; min: number | null; max: number | null; count: number }
+  restingHeartRate: { average: number | null }
+  steps: { total: number | null }
+  sleepMinutes: { total: number | null }
+  activeMinutes: { total: number | null }
+  zones: { label: string; minutes: number; share: number }[]
+  sampleCount: number
+}
+
+export interface AiHealthRequest {
+  summary: AiHealthSummaryPayload
+  question?: string
+  model?: string
+  temperature?: number
+  maxTokens?: number
+  context?: AiPlanningContext
+  toolsEnabled?: boolean
+}
+
+/**
  * Every tool the assistant is permitted to invoke. The server owns the
  * executable implementations; the browser only ever receives inert
  * proposals and calls the existing Supabase services itself.

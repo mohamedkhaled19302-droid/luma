@@ -5,6 +5,73 @@ export type PlanningStyleId = 'structured' | 'flexible' | 'balanced' | 'goal-foc
 export type PlanningDetail = 'simple' | 'normal' | 'detailed'
 
 /**
+ * Health readings the app can record.
+ *
+ * A wearable exposes far more than this, but only the values the scheduler and
+ * the AI guidance actually use are modelled. Anything else is dropped at the
+ * edge rather than stored, so the health table stays small and reviewable.
+ */
+export type HealthMetric =
+  | 'heart_rate'
+  | 'resting_heart_rate'
+  | 'hrv'
+  | 'steps'
+  | 'sleep_minutes'
+  | 'calories'
+  | 'distance_m'
+  | 'spo2'
+  | 'active_minutes'
+
+export const HEALTH_METRIC_UNITS: Record<HealthMetric, string> = {
+  heart_rate: 'bpm',
+  resting_heart_rate: 'bpm',
+  hrv: 'ms',
+  steps: 'steps',
+  sleep_minutes: 'min',
+  calories: 'kcal',
+  distance_m: 'm',
+  spo2: '%',
+  active_minutes: 'min',
+}
+
+/** Where a reading came from. Bluetooth is the live path; the rest are imports. */
+export type HealthSource = 'bluetooth' | 'manual' | 'import'
+
+export type HealthConnectionStatus = 'connected' | 'disconnected' | 'error'
+
+export interface HealthConnection {
+  id: string
+  user_id: string
+  source: HealthSource
+  device_name: string
+  device_handle: string | null
+  status: HealthConnectionStatus
+  connected_at: string
+  last_sample_at: string | null
+  meta: Record<string, unknown>
+  created_at: string
+}
+
+export interface HealthSample {
+  id: string
+  user_id: string
+  metric: HealthMetric
+  value: number
+  unit: string
+  recorded_at: string
+  received_at: string
+  source: HealthSource
+  device_name: string | null
+  session_id: string | null
+  note: string | null
+  created_at: string
+}
+
+/** A sample the app is about to write, before the database assigns an id. */
+export type HealthSampleInput = Omit<HealthSample, 'id' | 'user_id' | 'created_at' | 'received_at'>
+
+
+/**
  * A block the user cannot move: a work shift, a class, a training slot, an
  * appointment. Anything immovable that the scheduler has to plan around.
  */

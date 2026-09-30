@@ -27,6 +27,7 @@ import NotFoundPage from '@/pages/not-found'
 const TemplatesPage = lazy(() => import('@/pages/templates'))
 const FocusPage = lazy(() => import('@/pages/focus'))
 const AssistantPage = lazy(() => import('@/pages/assistant'))
+const HealthPage = lazy(() => import('@/pages/health'))
 
 function lazyScreen(element: ReactNode) {
   return <Suspense fallback={<SpinnerScreen />}>{element}</Suspense>
@@ -125,6 +126,7 @@ export const router = createBrowserRouter(
         { path: '/tasks', element: <TasksPage /> },
         { path: '/habits', element: <HabitsPage /> },
         { path: '/wellbeing', element: <WellbeingPage /> },
+        { path: '/health', element: lazyScreen(<HealthPage />) },
         { path: '/categories', element: <CategoriesPage /> },
         { path: '/insights', element: <InsightsPage /> },
         { path: '/templates', element: lazyScreen(<TemplatesPage />) },

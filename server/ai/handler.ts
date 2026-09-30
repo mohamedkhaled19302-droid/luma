@@ -8,6 +8,7 @@ import {
   type FetchLike,
 } from './models.js'
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE, runPlanningChat } from './openrouter.js'
+import { parseHealthSummary, runHealthGuidance } from './health.js'
 import { isKnownTool } from './tools.js'
 import {
   MAX_SYSTEM_PROMPT_CHARS,
@@ -186,6 +187,65 @@ function readConfirmation(value: unknown): { confirmationId: string; tool: strin
   if (typeof confirmationId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(confirmationId)) return undefined
   if (typeof tool !== 'string' || !isKnownTool(tool)) return undefined
   return { confirmationId, tool, args: record['args'] }
+}
+
+/**
+ * POST /api/ai/health — guidance grounded in the caller's own readings.
+ *
+ * The browser sends a validated summary of its wearable data; the server never
+ * reads the health tables. See ./health.ts for why that boundary exists and what
+ * the model is forbidden from doing with the numbers.
+ */
+export async function handleHealth(
+  payload: unknown,
+  config: AiServerConfig,
+  deps: HandlerDeps,
+): Promise<HandlerResult<AiChatResponse | AiErrorResponse>> {
+  try {
+    if (!config.apiKey) {
+      throw new AiProxyError(
+        'missing_key',
+        'The health guide is not configured yet. Add OPENROUTER_API_KEY on the server to enable it.',
+      )
+    }
+    if (!payload || typeof payload !== 'object') {
+      throw new AiProxyError('bad_request', 'A JSON body is required.', { status: 400 })
+    }
+
+    const raw = payload as Record<string, unknown>
+    const summary = parseHealthSummary(raw['summary'])
+    const temperature = clampTemperature(raw['temperature'], config.temperature)
+    const maxTokens = clampMaxTokens(raw['maxTokens'], config.maxTokens)
+    const context = sanitizeContext(raw['context'])
+    const question = typeof raw['question'] === 'string' ? raw['question'] : ''
+
+    const list = await getFreeModels({
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+      fetchImpl: deps.fetchImpl,
+      now: deps.now,
+    })
+    const requested = (typeof raw['model'] === 'string' ? raw['model'].trim() : '') || config.defaultModel || undefined
+    const resolution = resolveModelCandidates(requested, list)
+    const candidates = resolution.candidates.length > 0 ? resolution.candidates : [FREE_ROUTER_MODEL]
+
+    const response = await runHealthGuidance({
+      apiKey: config.apiKey,
+      fetchImpl: deps.fetchImpl,
+      baseUrl: config.baseUrl,
+      modelCandidates: candidates,
+      summary,
+      question,
+      context,
+      temperature,
+      maxTokens,
+      toolsEnabled: raw['toolsEnabled'] === true,
+    })
+
+    return { status: 200, body: response }
+  } catch (error) {
+    return errorResult(toAiProxyError(error))
+  }
 }
 
 export { FREE_LIST_TTL_MS, FREE_ROUTER_MODEL }
