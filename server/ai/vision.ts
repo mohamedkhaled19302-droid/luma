@@ -132,6 +132,7 @@ async function runVision(
       if (!content) {
         throw new AiProxyError('model_unavailable', 'That model could not read the screen.', {
           retryable: true,
+          modelBlocked: true,
         })
       }
 

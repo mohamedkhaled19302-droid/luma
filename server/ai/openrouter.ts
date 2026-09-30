@@ -220,9 +220,12 @@ export async function requestCompletion(input: CompletionInput): Promise<Complet
     }
 
     if (!content && toolCalls.length === 0) {
-      // Reasoning-only or empty replies are retried on another free model.
+      // Reasoning-only or empty replies are retried on another free model, and
+      // this model is not nominated again: producing no text at all is a
+      // property of the model, not bad luck.
       throw new AiProxyError('model_unavailable', 'That model returned an empty reply.', {
         retryable: true,
+        modelBlocked: true,
       })
     }
 

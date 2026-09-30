@@ -259,6 +259,36 @@ describe('POST /api/ai/chat', () => {
       .map((call) => String(call.body?.['model']))
     expect(secondModels).toEqual([FREE_ROUTER_MODEL])
   })
+
+  it('remembers a model that answers with no text and stops nominating it', async () => {
+    // Reasoning-only and classifier models answer 200 with null content, so the
+    // chain recovers — but nominating them again burns another attempt.
+    const silent = {
+      model: 'demo/helper:free',
+      choices: [{ message: { role: 'assistant', content: null, reasoning: 'classifying' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 4 },
+    }
+    const first = fakeOpenRouter((attempt) =>
+      attempt === 1
+        ? { status: 200, payload: silent }
+        : { status: 200, payload: replyPayload('Recovered.', FREE_ROUTER_MODEL) },
+    )
+    const recovered = await handleChat(userTurn, readServerConfig(ENV), deps(first.fetchImpl))
+    expect(recovered.status).toBe(200)
+    expect(
+      first.calls.filter((c) => c.url.endsWith('/chat/completions')).map((c) => String(c.body?.['model'])),
+    ).toEqual(['demo/helper:free', FREE_ROUTER_MODEL])
+
+    const second = fakeOpenRouter(() => ({
+      status: 200,
+      payload: replyPayload('Again.', FREE_ROUTER_MODEL),
+    }))
+    const again = await handleChat(userTurn, readServerConfig(ENV), deps(second.fetchImpl))
+    expect(again.status).toBe(200)
+    expect(
+      second.calls.filter((c) => c.url.endsWith('/chat/completions')).map((c) => String(c.body?.['model'])),
+    ).toEqual([FREE_ROUTER_MODEL])
+  })
 })
 
 
