@@ -113,6 +113,15 @@ export function mapUpstreamStatus(status: number, upstreamMessage: string): AiPr
     })
   }
   if (status === 400 || status === 422) {
+    // A model that insists on reasoning cannot be used for a short reply, so
+    // treat it as this model's limitation rather than a user error: another
+    // free model can still answer.
+    if (/reasoning/i.test(upstreamMessage)) {
+      return new AiProxyError('model_unavailable', 'That model cannot answer without reasoning.', {
+        retryable: true,
+        modelBlocked: true,
+      })
+    }
     return new AiProxyError('bad_request', `The request was rejected by the model. ${detail}`.trim(), {
       status: 400,
     })

@@ -175,6 +175,12 @@ export async function requestCompletion(input: CompletionInput): Promise<Complet
         messages: input.messages,
         temperature: input.temperature,
         max_tokens: input.maxTokens,
+        // Several free models are reasoning models: they spend the whole token
+        // budget thinking and return `content: null`, which reads as an empty
+        // reply. Asking them not to reason is what makes them answer at all
+        // (`nemotron-3-ultra` goes from no content to a full reply). Models that
+        // require reasoning answer 400 and are skipped.
+        reasoning: { enabled: false },
         // Only sent when the caller wants tool use; several free models reject
         // the field outright, so the caller retries without it.
         ...(input.tools && input.tools.length > 0 ? { tools: input.tools, tool_choice: 'auto' } : {}),

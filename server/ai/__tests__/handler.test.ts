@@ -260,6 +260,33 @@ describe('POST /api/ai/chat', () => {
     expect(secondModels).toEqual([FREE_ROUTER_MODEL])
   })
 
+  it('asks free models not to reason, so short replies come back with content', async () => {
+    // Reasoning models otherwise spend the whole token budget thinking and
+    // return `content: null`, which we can only treat as an empty reply.
+    const { fetchImpl, calls } = fakeOpenRouter(() => ({
+      status: 200,
+      payload: replyPayload('Keep it easy today.', 'demo/helper:free'),
+    }))
+    const result = await handleChat(userTurn, readServerConfig(ENV), deps(fetchImpl))
+    expect(result.status).toBe(200)
+    const chatCall = calls.find((call) => call.url.endsWith('/chat/completions'))
+    expect(chatCall?.body?.['reasoning']).toEqual({ enabled: false })
+  })
+
+  it('skips a model that insists on reasoning rather than failing the request', async () => {
+    const { fetchImpl } = fakeOpenRouter((attempt) =>
+      attempt === 1
+        ? {
+            status: 400,
+            payload: { error: { message: 'Reasoning is mandatory for this endpoint and cannot be disabled.' } },
+          }
+        : { status: 200, payload: replyPayload('Another model answered.', FREE_ROUTER_MODEL) },
+    )
+    const result = await handleChat(userTurn, readServerConfig(ENV), deps(fetchImpl))
+    expect(result.status).toBe(200)
+    expect((result.body as AiChatResponse).model).toBe(FREE_ROUTER_MODEL)
+  })
+
   it('remembers a model that answers with no text and stops nominating it', async () => {
     // Reasoning-only and classifier models answer 200 with null content, so the
     // chain recovers — but nominating them again burns another attempt.
