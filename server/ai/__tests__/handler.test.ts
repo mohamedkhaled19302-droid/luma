@@ -199,6 +199,38 @@ describe('POST /api/ai/chat', () => {
     expect((result.body as AiErrorResponse).error.code).toBe('invalid_key')
     expect(attempts).toBe(1)
   })
+
+  it('treats a 403 as a model problem and moves on to the next free model', async () => {
+    // OpenRouter answers 403 for free models it reserves for agentic harnesses.
+    // That says nothing about the key, so the chain has to keep going.
+    const { fetchImpl, calls } = fakeOpenRouter((attempt) =>
+      attempt === 1
+        ? {
+            status: 403,
+            payload: { error: { message: 'inkling-small:free is only available on agentic harnesses' } },
+          }
+        : { status: 200, payload: replyPayload('Recovered on the next model.', FREE_ROUTER_MODEL) },
+    )
+    const result = await handleChat(userTurn, readServerConfig(ENV), deps(fetchImpl))
+    expect(result.status).toBe(200)
+    const body = result.body as AiChatResponse
+    expect(body.reply).toBe('Recovered on the next model.')
+    expect(body.model).toBe(FREE_ROUTER_MODEL)
+    const chatCalls = calls.filter((call) => call.url.endsWith('/chat/completions'))
+    expect(chatCalls).toHaveLength(2)
+  })
+
+  it('does not blame the key when every free model is withheld', async () => {
+    const { fetchImpl } = fakeOpenRouter(() => ({
+      status: 403,
+      payload: { error: { message: 'only available on agentic harnesses' } },
+    }))
+    const result = await handleChat(userTurn, readServerConfig(ENV), deps(fetchImpl))
+    expect(result.status).toBe(502)
+    const body = result.body as AiErrorResponse
+    expect(body.error.code).toBe('model_unavailable')
+    expect(body.error.code).not.toBe('invalid_key')
+  })
 })
 
 

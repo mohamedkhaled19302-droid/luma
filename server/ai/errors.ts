@@ -68,8 +68,17 @@ function isRetryable(code: AiErrorCode): boolean {
 /** Map an HTTP status from OpenRouter onto a typed, user-safe error. */
 export function mapUpstreamStatus(status: number, upstreamMessage: string): AiProxyError {
   const detail = sanitizeUpstreamMessage(upstreamMessage)
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     return new AiProxyError('invalid_key', 'The OpenRouter API key was rejected.', { status: 502 })
+  }
+  if (status === 403) {
+    // A 403 is about the model, not the key. Free models can be restricted to
+    // agentic harnesses, or withheld from this account, and either way the next
+    // candidate may well work — so this must not abort the whole chain.
+    return new AiProxyError('model_unavailable', `That model is not available here. ${detail}`.trim(), {
+      status: 502,
+      retryable: true,
+    })
   }
   if (status === 402) {
     return new AiProxyError(
